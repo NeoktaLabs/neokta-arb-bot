@@ -1,21 +1,27 @@
 // src/domain/constants.ts
 
-import type { Token } from "./types";
+import type { Address } from "./types";
 
-export const TOKENS: Record<string, Token> = {
-  USDC: {
-    symbol: "USDC",
-    address: "0x...", // TODO: replace with real Etherlink USDC
-    decimals: 6,
-  },
-  WXTZ: {
-    symbol: "WXTZ",
-    address: "0x...", // TODO
-    decimals: 18,
-  },
-  STXTZ: {
-    symbol: "stXTZ",
-    address: "0x...", // TODO
-    decimals: 18,
-  },
-};
+export const DEFAULT_ETHERLINK_RPC_URL = "https://node.mainnet.etherlink.com";
+
+export function normalizeAddress(value: string): Address {
+  const trimmed = value.trim();
+
+  if (!trimmed.startsWith("0x")) {
+    throw new Error(`Invalid address: ${value}`);
+  }
+
+  return trimmed.toLowerCase() as Address;
+}
+
+export function addressesEqual(a: string, b: string): boolean {
+  return normalizeAddress(a) === normalizeAddress(b);
+}
+
+export function normalizeSymbol(symbol: string): string {
+  return symbol.trim().toUpperCase();
+}
+
+export function isUsdcAddress(address: string, usdcAddress: string): boolean {
+  return addressesEqual(address, usdcAddress);
+}
