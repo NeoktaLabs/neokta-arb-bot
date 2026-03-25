@@ -3,31 +3,35 @@
 import type { TokenGraph } from "../graph/graph.types";
 import type { GeneratedPath, PathLeg } from "./path.types";
 
-const START_TOKEN = "USDC";
 const MAX_DEPTH = 3;
 
 function buildLeg(
   edge: {
     poolAddress: string;
     poolName: string;
-    tokenA: string;
-    tokenB: string;
+    tokenAAddress: string;
+    tokenBAddress: string;
+    tokenASymbol: string;
+    tokenBSymbol: string;
     indexA: number;
     indexB: number;
     decimalsA: number;
     decimalsB: number;
   },
-  fromToken: string
-): { leg: PathLeg; nextToken: string } {
-  const fromA = edge.tokenA === fromToken;
+  fromTokenAddress: string
+): { leg: PathLeg; nextTokenAddress: string } {
+  const fromA = edge.tokenAAddress.toLowerCase() === fromTokenAddress.toLowerCase();
 
   return {
     leg: {
-      poolAddress: edge.poolAddress,
+      poolAddress: edge.poolAddress as `0x${string}`,
       poolName: edge.poolName,
 
-      tokenInSymbol: fromToken,
-      tokenOutSymbol: fromA ? edge.tokenB : edge.tokenA,
+      tokenInAddress: (fromA ? edge.tokenAAddress : edge.tokenBAddress) as `0x${string}`,
+      tokenOutAddress: (fromA ? edge.tokenBAddress : edge.tokenAAddress) as `0x${string}`,
+
+      tokenInSymbol: fromA ? edge.tokenASymbol : edge.tokenBSymbol,
+      tokenOutSymbol: fromA ? edge.tokenBSymbol : edge.tokenASymbol,
 
       tokenInIndex: fromA ? edge.indexA : edge.indexB,
       tokenOutIndex: fromA ? edge.indexB : edge.indexA,
@@ -35,7 +39,7 @@ function buildLeg(
       tokenInDecimals: fromA ? edge.decimalsA : edge.decimalsB,
       tokenOutDecimals: fromA ? edge.decimalsB : edge.decimalsA,
     },
-    nextToken: fromA ? edge.tokenB : edge.tokenA,
+    nextTokenAddress: fromA ? edge.tokenBAddress : edge.tokenAAddress,
   };
 }
 
@@ -44,29 +48,36 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
   const seen = new Set<string>();
 
   function dfs(
-    currentToken: string,
+    startTokenAddress: string,
+    currentTokenAddress: string,
     depth: number,
     currentLegs: PathLeg[],
     visitedPools: Set<string>
   ) {
     if (depth > MAX_DEPTH) return;
 
-    const edges = graph.adjacency.get(currentToken) ?? [];
+    const edges = graph.adjacency.get(currentTokenAddress.toLowerCase()) ?? [];
 
     for (const edge of edges) {
-      if (visitedPools.has(edge.poolAddress)) continue;
+      if (visitedPools.has(edge.poolAddress.toLowerCase())) continue;
 
-      const { leg, nextToken } = buildLeg(edge, currentToken);
+      const { leg, nextTokenAddress } = buildLeg(edge, currentTokenAddress);
 
       const nextLegs = [...currentLegs, leg];
       const nextVisitedPools = new Set(visitedPools);
-      nextVisitedPools.add(edge.poolAddress);
+      nextVisitedPools.add(edge.poolAddress.toLowerCase());
 
-      if (nextToken === START_TOKEN && nextLegs.length >= 2) {
+      if (
+        nextTokenAddress.toLowerCase() === startTokenAddress.toLowerCase() &&
+        nextLegs.length >= 2
+      ) {
         const key = [
           "multi",
+          startTokenAddress.toLowerCase(),
           ...nextLegs.map((item) => item.poolAddress.toLowerCase()),
-          ...nextLegs.map((item) => `${item.tokenInSymbol}->${item.tokenOutSymbol}`),
+          ...nextLegs.map(
+            (item) => `${item.tokenInAddress.toLowerCase()}->${item.tokenOutAddress.toLowerCase()}`
+          ),
         ].join(":");
 
         if (!seen.has(key)) {
@@ -75,6 +86,7 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
           paths.push({
             key,
             type: "multi-hop-roundtrip",
+            sharedTokenAddress: nextLegs[0].tokenOutAddress,
             sharedTokenSymbol: "MULTI",
             legs: nextLegs,
           });
@@ -83,11 +95,13 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
         continue;
       }
 
-      dfs(nextToken, depth + 1, nextLegs, nextVisitedPools);
+      dfs(startTokenAddress, nextTokenAddress, depth + 1, nextLegs, nextVisitedPools);
     }
   }
 
-  dfs(START_TOKEN, 0, [], new Set());
+  for (const usdcAddress of graph.usdcAddresses) {
+    dfs(usdcAddress, usdcAddress, 0, [], new Set());
+  }
 
   return paths;
 }
