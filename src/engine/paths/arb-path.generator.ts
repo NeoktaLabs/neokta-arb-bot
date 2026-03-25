@@ -8,8 +8,11 @@ function buildUsdcToTokenLeg(pool: ArbCandidate["pools"][number]): PathLeg {
     poolAddress: pool.address,
     poolName: pool.name ?? pool.address,
 
+    tokenInAddress: pool.usdcAddress,
+    tokenOutAddress: pool.tokenAddress,
+
     tokenInSymbol: pool.usdcSymbol,
-    tokenOutSymbol: pool.token,
+    tokenOutSymbol: pool.tokenSymbol,
 
     tokenInIndex: pool.usdcIndex,
     tokenOutIndex: pool.tokenIndex,
@@ -24,7 +27,10 @@ function buildTokenToUsdcLeg(pool: ArbCandidate["pools"][number]): PathLeg {
     poolAddress: pool.address,
     poolName: pool.name ?? pool.address,
 
-    tokenInSymbol: pool.token,
+    tokenInAddress: pool.tokenAddress,
+    tokenOutAddress: pool.usdcAddress,
+
+    tokenInSymbol: pool.tokenSymbol,
     tokenOutSymbol: pool.usdcSymbol,
 
     tokenInIndex: pool.tokenIndex,
@@ -51,7 +57,7 @@ export function generateArbPaths(candidates: ArbCandidate[]): GeneratedPath[] {
 
         const key = [
           "cross",
-          candidate.token,
+          candidate.tokenAddress.toLowerCase(),
           entryPool.address.toLowerCase(),
           exitPool.address.toLowerCase(),
         ].join(":");
@@ -59,7 +65,8 @@ export function generateArbPaths(candidates: ArbCandidate[]): GeneratedPath[] {
         paths.push({
           key,
           type: "cross-pool-roundtrip",
-          sharedTokenSymbol: candidate.token,
+          sharedTokenAddress: candidate.tokenAddress,
+          sharedTokenSymbol: candidate.tokenSymbol,
           legs: [leg1, leg2],
         });
       }
