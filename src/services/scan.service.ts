@@ -5,6 +5,7 @@ import { getEnv } from "../config/env";
 import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter";
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
 import { buildTokenGraph } from "../engine/graph/graph.builder";
+import { monitorPoolImbalance } from "../engine/imbalance/imbalance.monitor";
 import { generateArbPaths } from "../engine/paths/arb-path.generator";
 import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
 import { generatePaths } from "../engine/paths/path.generator";
@@ -191,6 +192,23 @@ export async function runScan(env: Env) {
     )
     .map(summarizeLadder);
 
+  // 7. Internal imbalance monitoring
+  const imbalanceTargets = discoveredPools.filter((pool) => {
+    const symbols = pool.coins.map((coin) => coin.symbol.toUpperCase());
+    return symbols.includes("STXTZ") && symbols.includes("WXTZ");
+  });
+
+  const imbalanceReports = [];
+  for (const pool of imbalanceTargets) {
+    imbalanceReports.push(
+      await monitorPoolImbalance({
+        env,
+        pool,
+        quoteSizes: [1, 10, 100],
+      })
+    );
+  }
+
   const output = {
     totalConfiguredPools: discoveredPools.length,
     totalTwoCoinPools: twoCoinPools.length,
@@ -245,6 +263,11 @@ export async function runScan(env: Env) {
       arbitrage: bestArbLadders,
       multiHop: bestMultiHopLadders,
     },
+
+    imbalanceMonitoring: {
+      totalTargets: imbalanceTargets.length,
+      reports: imbalanceReports,
+    },
   };
 
   logInfo("Scan result", {
@@ -256,7 +279,7 @@ export async function runScan(env: Env) {
     multiHopPaths: output.multiHop.totalPaths,
     profitableArb: output.arbitrage.profitableCount,
     profitableMultiHop: output.multiHop.profitableCount,
-    testedSizes: output.sizeLadder.testedSizes,
+    imbalanceTargets: output.imbalanceMonitoring.totalTargets,
   });
 
   return output;
