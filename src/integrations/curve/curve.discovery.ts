@@ -1,45 +1,51 @@
 // src/integrations/curve/curve.discovery.ts
 
 import type { Env } from "../../domain/types";
+import { logError, logInfo } from "../../lib/logger";
+import { hasThirdCoin, getCurvePoolSnapshot } from "./curve.client";
 import { CURVE_POOLS } from "./curve.pools";
-import { getCurvePoolSnapshot } from "./curve.client";
+import type { DiscoveredCurvePool } from "./curve.types";
 
-export interface DiscoveredCurvePool {
-  name: string;
-  address: string;
-  coins: {
-    symbol: string;
-    decimals: number;
-    index: number;
-  }[];
-  hasUsdc: boolean;
+function isUsdc(symbol: string): boolean {
+  const normalized = symbol.trim().toUpperCase();
+  return normalized === "USDC" || normalized === "USDCE" || normalized === "USDC.E";
 }
 
-export async function discoverCurvePools(env: Env) {
+export async function discoverCurvePools(env: Env): Promise<DiscoveredCurvePool[]> {
   const results: DiscoveredCurvePool[] = [];
 
   for (const pool of CURVE_POOLS) {
     try {
       const snapshot = await getCurvePoolSnapshot(env, pool.address);
+      const thirdCoin = await hasThirdCoin(env, pool.address);
 
-      const coins = snapshot.coins.map((c) => ({
-        symbol: c.symbol,
-        decimals: c.decimals,
-        index: c.index,
-      }));
-
-      const hasUsdc = coins.some(
-        (c) => c.symbol.toUpperCase() === "USDC"
-      );
-
-      results.push({
+      const discovered: DiscoveredCurvePool = {
         name: pool.name,
         address: pool.address,
-        coins,
-        hasUsdc,
+        coins: snapshot.coins,
+        hasUsdc: snapshot.coins.some((coin) => isUsdc(coin.symbol)),
+        isTwoCoinPool: !thirdCoin,
+      };
+
+      results.push(discovered);
+
+      logInfo("Discovered Curve pool", {
+        pool: pool.name,
+        address: pool.address,
+        coins: snapshot.coins.map((coin) => ({
+          index: coin.index,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+        })),
+        hasUsdc: discovered.hasUsdc,
+        isTwoCoinPool: discovered.isTwoCoinPool,
       });
-    } catch (err) {
-      console.error("Failed to load pool", pool.address, err);
+    } catch (error) {
+      logError("Failed to discover Curve pool", {
+        pool: pool.name,
+        address: pool.address,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
