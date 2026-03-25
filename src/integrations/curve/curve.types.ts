@@ -15,12 +15,14 @@ export interface CurvePoolCoin {
 export interface CurvePoolSnapshot {
   poolAddress: string;
   coins: CurvePoolCoin[];
+  balances: number[];
 }
 
 export interface DiscoveredCurvePool {
   name: string;
   address: string;
   coins: CurvePoolCoin[];
+  balances: number[];
   hasUsdc: boolean;
   isTwoCoinPool: boolean;
 }
