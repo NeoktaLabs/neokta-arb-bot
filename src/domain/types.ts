@@ -7,6 +7,17 @@ export interface Env {
   INITIAL_USDC?: string;
   MIN_PROFIT_USD?: string;
   USDC_ADDRESS?: string;
+
+  ENABLE_TELEGRAM_ALERTS?: string;
+  ENABLE_NEAR_MISS_ALERTS?: string;
+  ENABLE_IMBALANCE_ALERTS?: string;
+
+  NEAR_MISS_MIN_PNL_USD?: string;
+  IMBALANCE_ALERT_THRESHOLD_PCT?: string;
+  MAX_ALERTS_PER_SCAN?: string;
+
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
 }
 
 export type TokenSymbol = string;
