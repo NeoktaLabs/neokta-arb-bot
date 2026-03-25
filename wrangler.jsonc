@@ -1,0 +1,13 @@
+// wrangler.jsonc
+
+{
+  "name": "neokta-arb-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-23",
+
+  "vars": {
+    "INITIAL_USDC": "1000",
+    "MIN_PROFIT_USD": "5",
+    "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com"
+  }
+}
