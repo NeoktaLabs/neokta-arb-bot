@@ -3,7 +3,14 @@
 export interface TrustedPool {
   address: string;
   name?: string;
-  token: string; // non-USDC token
+
+  usdcSymbol: string;
+  usdcIndex: number;
+  usdcDecimals: number;
+
+  token: string;
+  tokenIndex: number;
+  tokenDecimals: number;
 }
 
 export interface TokenCluster {
