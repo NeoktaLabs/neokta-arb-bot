@@ -5,6 +5,35 @@ import { getDefaultSizeLadder, simulatePathAcrossSizes } from "../sizing/size-la
 import type { GeneratedPath } from "../paths/path.types";
 import type { OpportunityCandidate, OpportunityEvaluation } from "./opportunity.types";
 
+function dedupeEvaluations(
+  evaluations: OpportunityEvaluation[]
+): OpportunityEvaluation[] {
+  const seen = new Set<string>();
+  const deduped: OpportunityEvaluation[] = [];
+
+  for (const evaluation of evaluations) {
+    const signature = [
+      evaluation.candidate.key,
+      evaluation.candidate.direction,
+      evaluation.candidate.poolAddress.toLowerCase(),
+      evaluation.candidate.token0Symbol,
+      evaluation.candidate.token1Symbol,
+      evaluation.bestOverall?.size ?? "none",
+      evaluation.bestOverall?.pnlUsd ?? "none",
+      evaluation.curve.length,
+    ].join(":");
+
+    if (seen.has(signature)) {
+      continue;
+    }
+
+    seen.add(signature);
+    deduped.push(evaluation);
+  }
+
+  return deduped;
+}
+
 export async function evaluateOpportunityPaths(args: {
   env: Env;
   candidates: OpportunityCandidate[];
@@ -70,7 +99,9 @@ export async function evaluateOpportunityPaths(args: {
     });
   }
 
-  return evaluations.sort((a, b) => {
+  const deduped = dedupeEvaluations(evaluations);
+
+  return deduped.sort((a, b) => {
     const aScore = a.bestOverall?.pnlUsd ?? -Infinity;
     const bScore = b.bestOverall?.pnlUsd ?? -Infinity;
     return bScore - aScore;
