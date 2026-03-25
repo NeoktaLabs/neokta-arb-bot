@@ -2,6 +2,10 @@
 
 import type { Env } from "../domain/types";
 import { getEnv } from "../config/env";
+import {
+  filterPositiveOpportunityEvaluations,
+  filterPositiveRouteResults,
+} from "../engine/filters/opportunity.filter";
 import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter";
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
 import { buildTokenGraph } from "../engine/graph/graph.builder";
@@ -48,6 +52,14 @@ function summarizeLadder(ladder: any) {
           health: ladder.bestHealthy.health,
         }
       : null,
+    bestPositive: ladder.bestPositive
+      ? {
+          size: ladder.bestPositive.size,
+          pnlUsd: ladder.bestPositive.result.pnlUsd,
+          pnlPct: ladder.bestPositive.result.pnlPct,
+          health: ladder.bestPositive.health,
+        }
+      : null,
     curve: ladder.sizes.map((entry: any) => ({
       size: entry.size,
       pnlUsd: entry.result?.pnlUsd ?? null,
@@ -66,6 +78,23 @@ function isUnsupportedEvaluation(entry: any): boolean {
   return entry.curve.every((point: any) => point.health === "unsupported");
 }
 
+async function simulateAndClassifyPaths(env: Env, paths: any[]) {
+  const results = [];
+
+  for (const path of paths) {
+    const simulation = await simulatePath(env, path, getEnv(env).initialUsdc);
+    const classification = classifySimulationResult(simulation);
+
+    results.push({
+      ...simulation,
+      health: classification.health,
+      healthReasons: classification.reasons,
+    });
+  }
+
+  return results;
+}
+
 export async function runScan(env: Env) {
   const config = getEnv(env);
   const sizeLadder = getDefaultSizeLadder();
@@ -76,18 +105,7 @@ export async function runScan(env: Env) {
   const usdcPools = twoCoinPools.filter((pool) => pool.hasUsdc);
 
   const baselinePaths = generatePaths(usdcPools);
-
-  const baselineRawResults = [];
-  for (const path of baselinePaths) {
-    const simulation = await simulatePath(env, path, config.initialUsdc);
-    const classification = classifySimulationResult(simulation);
-
-    baselineRawResults.push({
-      ...simulation,
-      health: classification.health,
-      healthReasons: classification.reasons,
-    });
-  }
+  const baselineRawResults = await simulateAndClassifyPaths(env, baselinePaths);
 
   const healthyBaselineResults = baselineRawResults.filter(
     (result: any) => result.health === "healthy"
@@ -106,42 +124,17 @@ export async function runScan(env: Env) {
   const arbCandidates = findArbCandidates(tokenClusters);
 
   const arbPaths = generateArbPaths(arbCandidates);
-
-  const arbResults = [];
-  for (const path of arbPaths) {
-    const simulation = await simulatePath(env, path, config.initialUsdc);
-    const classification = classifySimulationResult(simulation);
-
-    arbResults.push({
-      ...simulation,
-      health: classification.health,
-      healthReasons: classification.reasons,
-    });
-  }
+  const arbResults = await simulateAndClassifyPaths(env, arbPaths);
 
   const healthyArbResults = arbResults.filter((result: any) => result.health === "healthy");
   const suspiciousArbResults = arbResults.filter((result: any) => result.health === "suspicious");
   const unsupportedArbResults = arbResults.filter((result: any) => result.health === "unsupported");
 
-  const profitableArbResults = healthyArbResults
-    .filter((result: any) => typeof result.pnlUsd === "number")
-    .filter((result: any) => result.pnlUsd > config.minProfitUsd)
-    .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
+  const profitableArbResults = filterPositiveRouteResults(healthyArbResults, config);
 
   const graph = buildTokenGraph(discoveredPools);
   const multiHopPaths = generateMultiHopPaths(graph);
-
-  const multiHopResults = [];
-  for (const path of multiHopPaths) {
-    const simulation = await simulatePath(env, path, config.initialUsdc);
-    const classification = classifySimulationResult(simulation);
-
-    multiHopResults.push({
-      ...simulation,
-      health: classification.health,
-      healthReasons: classification.reasons,
-    });
-  }
+  const multiHopResults = await simulateAndClassifyPaths(env, multiHopPaths);
 
   const healthyMultiHopResults = multiHopResults.filter(
     (result: any) => result.health === "healthy"
@@ -153,10 +146,7 @@ export async function runScan(env: Env) {
     (result: any) => result.health === "unsupported"
   );
 
-  const profitableMultiHopResults = healthyMultiHopResults
-    .filter((result: any) => typeof result.pnlUsd === "number")
-    .filter((result: any) => result.pnlUsd > config.minProfitUsd)
-    .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
+  const profitableMultiHopResults = filterPositiveRouteResults(healthyMultiHopResults, config);
 
   const baselineLadders = [];
   for (const path of baselinePaths) {
@@ -239,17 +229,22 @@ export async function runScan(env: Env) {
     (entry) => isUnsupportedEvaluation(entry)
   );
 
-  const profitableInternalOpportunities = supportedInternalEvaluations.filter(
-    (entry) =>
-      entry.bestHealthy &&
-      typeof entry.bestHealthy.pnlUsd === "number" &&
-      entry.bestHealthy.pnlUsd > config.minProfitUsd
+  const profitableInternalOpportunities = filterPositiveOpportunityEvaluations(
+    supportedInternalEvaluations,
+    config
   );
 
   const output = {
     totalConfiguredPools: discoveredPools.length,
     totalTwoCoinPools: twoCoinPools.length,
     totalUsdcTwoCoinPools: usdcPools.length,
+
+    config: {
+      initialUsdc: config.initialUsdc,
+      minAlertProfitUsd: config.minAlertProfitUsd,
+      minConfidentProfitUsd: config.minConfidentProfitUsd,
+      nearMissMinPnlUsd: config.nearMissMinPnlUsd,
+    },
 
     poolHealth,
 
@@ -336,6 +331,7 @@ export async function runScan(env: Env) {
     supportedInternal: output.internalOpportunities.supportedCount,
     profitableInternal: output.internalOpportunities.profitableCount,
     preparedAlerts: alertMessages.length,
+    minAlertProfitUsd: config.minAlertProfitUsd,
     telegramEnabled: alertDelivery.enabled,
     telegramSent: alertDelivery.sent,
   });

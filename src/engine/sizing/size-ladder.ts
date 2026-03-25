@@ -2,6 +2,7 @@
 
 import type { Env } from "../../domain/types";
 import { classifySimulationResult } from "../filters/result-quality.filter";
+import { isPositiveNetPnl } from "../pnl/pnl.service";
 import type { GeneratedPath } from "../paths/path.types";
 import { simulatePath } from "../paths/path.simulator";
 
@@ -18,6 +19,7 @@ export interface PathLadderSummary {
   sizes: SizedSimulationResult[];
   bestOverall: SizedSimulationResult | null;
   bestHealthy: SizedSimulationResult | null;
+  bestPositive: SizedSimulationResult | null;
 }
 
 export function getDefaultSizeLadder(): number[] {
@@ -51,6 +53,10 @@ export async function simulatePathAcrossSizes(
     (entry) => entry.health === "healthy"
   );
 
+  const positiveResults = healthyResults.filter((entry) =>
+    isPositiveNetPnl(entry.result?.pnlUsd, { minAlertProfitUsd: 0 })
+  );
+
   const bestOverall =
     resultsWithPnl.length > 0
       ? [...resultsWithPnl].sort(
@@ -65,11 +71,19 @@ export async function simulatePathAcrossSizes(
         )[0]
       : null;
 
+  const bestPositive =
+    positiveResults.length > 0
+      ? [...positiveResults].sort(
+          (a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number)
+        )[0]
+      : null;
+
   return {
     key: path.key,
     type: path.type,
     sizes: ladderResults,
     bestOverall,
     bestHealthy,
+    bestPositive,
   };
 }

@@ -18,10 +18,18 @@ export function getEnv(env: Env) {
     throw new Error("Missing required env var: USDC_ADDRESS");
   }
 
+  const minAlertProfitUsd = parseNumber(env.MIN_ALERT_PROFIT_USD, 0);
+  const minConfidentProfitUsd = parseNumber(
+    env.MIN_CONFIDENT_PROFIT_USD ?? env.MIN_PROFIT_USD,
+    0.25
+  );
+
   return {
     rpcUrl: env.ETHERLINK_RPC_URL || DEFAULT_ETHERLINK_RPC_URL,
     initialUsdc: parseNumber(env.INITIAL_USDC, 1000),
-    minProfitUsd: parseNumber(env.MIN_PROFIT_USD, 5),
+    minProfitUsd: minAlertProfitUsd,
+    minAlertProfitUsd,
+    minConfidentProfitUsd,
     usdcAddress: normalizeAddress(env.USDC_ADDRESS),
 
     enableTelegramAlerts: parseBoolean(env.ENABLE_TELEGRAM_ALERTS, false),

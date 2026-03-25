@@ -6,6 +6,8 @@ export interface Env {
   ETHERLINK_RPC_URL?: string;
   INITIAL_USDC?: string;
   MIN_PROFIT_USD?: string;
+  MIN_ALERT_PROFIT_USD?: string;
+  MIN_CONFIDENT_PROFIT_USD?: string;
   USDC_ADDRESS?: string;
 
   ENABLE_TELEGRAM_ALERTS?: string;

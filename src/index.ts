@@ -3,15 +3,25 @@
 import type { Env } from "./domain/types";
 import { runScan } from "./services/scan.service";
 
-export default {
-  async fetch(_request: Request, env: Env) {
-    try {
-      const result = await runScan(env);
+async function run(env: Env) {
+  const result = await runScan(env);
 
-      return Response.json({
-        ok: true,
-        result,
-      });
+  return Response.json({
+    ok: true,
+    result,
+  });
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    try {
+      const url = new URL(request.url);
+
+      if (url.pathname === "/health") {
+        return Response.json({ ok: true });
+      }
+
+      return await run(env);
     } catch (error) {
       return Response.json(
         {
@@ -21,5 +31,9 @@ export default {
         { status: 500 }
       );
     }
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runScan(env));
   },
 };

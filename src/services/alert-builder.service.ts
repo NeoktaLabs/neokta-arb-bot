@@ -2,6 +2,11 @@
 
 import { getEnv } from "../config/env";
 import type { Env } from "../domain/types";
+import {
+  getAlertPriorityScore,
+  selectBestAlertCandidate,
+} from "../engine/filters/opportunity.filter";
+import { getProfitTier, isNearMissPnl } from "../engine/pnl/pnl.service";
 import type { TelegramAlertMessage } from "./alert.service";
 
 function formatUsd(value: number | null | undefined): string {
@@ -9,7 +14,7 @@ function formatUsd(value: number | null | undefined): string {
     return "n/a";
   }
 
-  return `${value.toFixed(4)} USDC`;
+  return `${value.toFixed(6)} USDC`;
 }
 
 function formatPct(value: number | null | undefined): string {
@@ -17,7 +22,7 @@ function formatPct(value: number | null | undefined): string {
     return "n/a";
   }
 
-  return `${value.toFixed(4)}%`;
+  return `${(value * 100).toFixed(4)}%`;
 }
 
 function safeJsonLines(input: unknown): string {
@@ -52,25 +57,29 @@ export function buildAlertMessages(
     : [];
 
   for (const entry of profitableInternal) {
-    const best = entry?.bestHealthy ?? entry?.bestOverall;
+    const best = selectBestAlertCandidate(entry);
     const candidate = entry?.candidate;
 
     if (!best || typeof best.pnlUsd !== "number") {
       continue;
     }
 
+    const tier = getProfitTier(best.pnlUsd, config);
+    const titlePrefix = tier === "confident_profit" ? "🟢" : "🟩";
+
     messages.push({
       category: "profit",
-      title: "🟢 Profitable internal imbalance path",
-      score: best.pnlUsd,
+      title: `${titlePrefix} Positive internal imbalance path`,
+      score: best.pnlUsd + getAlertPriorityScore(best.pnlUsd, config),
       body: [
         `Pool: ${candidate?.poolName ?? candidate?.poolAddress ?? "unknown"}`,
         `Direction: ${candidate?.direction ?? "unknown"}`,
-        `Imbalance: ${formatPct(candidate?.imbalancePct)}`,
+        `Imbalance: ${typeof candidate?.imbalancePct === "number" ? candidate.imbalancePct.toFixed(4) : "n/a"}%`,
         `Best size: ${best.size ?? "n/a"} USDC`,
         `PnL: ${formatUsd(best.pnlUsd)}`,
         `PnL %: ${formatPct(best.pnlPct)}`,
         `Health: ${best.health ?? "unknown"}`,
+        `Tier: ${tier}`,
       ].join("\n"),
     });
   }
@@ -80,10 +89,13 @@ export function buildAlertMessages(
       continue;
     }
 
+    const tier = getProfitTier(entry.pnlUsd, config);
+    const titlePrefix = tier === "confident_profit" ? "🟢" : "🟩";
+
     messages.push({
       category: "profit",
-      title: "🟢 Profitable cross-pool cycle",
-      score: entry.pnlUsd,
+      title: `${titlePrefix} Positive cross-pool cycle`,
+      score: entry.pnlUsd + getAlertPriorityScore(entry.pnlUsd, config),
       body: [
         `Path key: ${entry?.key ?? "unknown"}`,
         `Initial: ${entry?.initialAmount ?? "n/a"} USDC`,
@@ -91,6 +103,7 @@ export function buildAlertMessages(
         `PnL: ${formatUsd(entry?.pnlUsd)}`,
         `PnL %: ${formatPct(entry?.pnlPct)}`,
         `Health: ${entry?.health ?? "unknown"}`,
+        `Tier: ${tier}`,
       ].join("\n"),
     });
   }
@@ -100,10 +113,13 @@ export function buildAlertMessages(
       continue;
     }
 
+    const tier = getProfitTier(entry.pnlUsd, config);
+    const titlePrefix = tier === "confident_profit" ? "🟢" : "🟩";
+
     messages.push({
       category: "profit",
-      title: "🟢 Profitable multi-hop cycle",
-      score: entry.pnlUsd,
+      title: `${titlePrefix} Positive multi-hop cycle`,
+      score: entry.pnlUsd + getAlertPriorityScore(entry.pnlUsd, config),
       body: [
         `Path key: ${entry?.key ?? "unknown"}`,
         `Initial: ${entry?.initialAmount ?? "n/a"} USDC`,
@@ -111,6 +127,7 @@ export function buildAlertMessages(
         `PnL: ${formatUsd(entry?.pnlUsd)}`,
         `PnL %: ${formatPct(entry?.pnlPct)}`,
         `Health: ${entry?.health ?? "unknown"}`,
+        `Tier: ${tier}`,
       ].join("\n"),
     });
   }
@@ -129,18 +146,14 @@ export function buildAlertMessages(
         continue;
       }
 
-      if (best.pnlUsd >= config.minProfitUsd) {
-        continue;
-      }
-
-      if (best.pnlUsd < config.nearMissMinPnlUsd) {
+      if (!isNearMissPnl(best.pnlUsd, config)) {
         continue;
       }
 
       messages.push({
         category: "near_miss",
         title: "🟡 Near-miss route worth watching",
-        score: best.pnlUsd,
+        score: best.pnlUsd + getAlertPriorityScore(best.pnlUsd, config),
         body: [
           `Type: ${ladder?.type ?? "unknown"}`,
           `Best size: ${best.size ?? "n/a"} USDC`,
@@ -168,7 +181,7 @@ export function buildAlertMessages(
         score: report.imbalancePct,
         body: [
           `Pool: ${report?.poolName ?? report?.poolAddress ?? "unknown"}`,
-          `Imbalance: ${formatPct(report?.imbalancePct)}`,
+          `Imbalance: ${typeof report?.imbalancePct === "number" ? report.imbalancePct.toFixed(4) : "n/a"}%`,
           `Classification: ${report?.classification ?? "unknown"}`,
           `Details:`,
           safeJsonLines({
