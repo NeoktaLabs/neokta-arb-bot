@@ -1,5 +1,6 @@
 // src/engine/universe/universe.builder.ts
 
+import type { DiscoveredCurvePool } from "../../integrations/curve/curve.types";
 import type { ArbCandidate, TokenCluster, TrustedPool } from "./universe.types";
 
 function normalize(symbol: string): string {
@@ -11,28 +12,48 @@ function isUsdc(symbol: string): boolean {
   return s === "USDC" || s === "USDCE" || s === "USDC.E";
 }
 
-export function buildTrustedPools(results: any[]): TrustedPool[] {
-  const pools: TrustedPool[] = [];
+function isHealthyPoolAddress(
+  address: string,
+  poolHealth: { address: string; status: string }[]
+): boolean {
+  const match = poolHealth.find(
+    (item) => item.address.toLowerCase() === address.toLowerCase()
+  );
 
-  for (const result of results) {
-    if (result.health !== "healthy") continue;
-    if (!Array.isArray(result.legs) || result.legs.length === 0) continue;
+  return match?.status === "healthy";
+}
 
-    const leg = result.legs[0];
+export function buildTrustedPools(
+  discoveredPools: DiscoveredCurvePool[],
+  poolHealth: { address: string; status: string }[]
+): TrustedPool[] {
+  const trusted: TrustedPool[] = [];
 
-    const tokenA = normalize(leg.fromSymbol);
-    const tokenB = normalize(leg.toSymbol);
+  for (const pool of discoveredPools) {
+    if (!pool.hasUsdc) continue;
+    if (!pool.isTwoCoinPool) continue;
+    if (!isHealthyPoolAddress(pool.address, poolHealth)) continue;
 
-    const nonUsdcToken = isUsdc(tokenA) ? tokenB : tokenA;
+    const usdcCoin = pool.coins.find((coin) => isUsdc(coin.symbol));
+    const otherCoin = pool.coins.find((coin) => !isUsdc(coin.symbol));
 
-    pools.push({
-      address: leg.poolAddress,
-      name: leg.pool,
-      token: nonUsdcToken,
+    if (!usdcCoin || !otherCoin) continue;
+
+    trusted.push({
+      address: pool.address,
+      name: pool.name,
+
+      usdcSymbol: usdcCoin.symbol,
+      usdcIndex: usdcCoin.index,
+      usdcDecimals: usdcCoin.decimals,
+
+      token: normalize(otherCoin.symbol),
+      tokenIndex: otherCoin.index,
+      tokenDecimals: otherCoin.decimals,
     });
   }
 
-  return pools;
+  return trusted;
 }
 
 export function buildTokenClusters(pools: TrustedPool[]): TokenCluster[] {
@@ -46,9 +67,9 @@ export function buildTokenClusters(pools: TrustedPool[]): TokenCluster[] {
     map.get(pool.token)!.push(pool);
   }
 
-  return Array.from(map.entries()).map(([token, pools]) => ({
+  return Array.from(map.entries()).map(([token, groupedPools]) => ({
     token,
-    pools,
+    pools: groupedPools,
   }));
 }
 
