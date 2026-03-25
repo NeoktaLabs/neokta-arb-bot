@@ -1,22 +1,40 @@
 // wrangler.jsonc
 
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "neokta-arb-bot",
   "main": "src/index.ts",
-  "compatibility_date": "2026-03-23",
+  "compatibility_date": "2026-03-25",
+
+  "triggers": {
+    "crons": [
+      "*/1 * * * *"
+    ]
+  },
 
   "vars": {
     "INITIAL_USDC": "1000",
-    "MIN_PROFIT_USD": "5",
+
+    // Alert on any positive full-route PnL
+    "MIN_ALERT_PROFIT_USD": "0",
+
+    // Optional stronger label for better opportunities
+    "MIN_CONFIDENT_PROFIT_USD": "0.25",
+
+    // Backward compatibility if parts of your code still read this
+    "MIN_PROFIT_USD": "0.25",
+
     "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com",
     "USDC_ADDRESS": "0x796Ea11Fa2dD751eD01b53C372fFDB4AAa8f00F9",
 
-    "ENABLE_TELEGRAM_ALERTS": "false",
+    "ENABLE_TELEGRAM_ALERTS": "true",
     "ENABLE_NEAR_MISS_ALERTS": "false",
     "ENABLE_IMBALANCE_ALERTS": "true",
 
     "NEAR_MISS_MIN_PNL_USD": "-1",
     "IMBALANCE_ALERT_THRESHOLD_PCT": "10",
-    "MAX_ALERTS_PER_SCAN": "5"
+    "MAX_ALERTS_PER_SCAN": "10",
+
+    "LOG_LEVEL": "info"
   }
 }
