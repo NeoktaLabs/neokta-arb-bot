@@ -12,6 +12,13 @@ const POOL_COINS_ABI = [
     inputs: [{ name: "i", type: "uint256" }],
     outputs: [{ type: "address" }],
   },
+  {
+    name: "balances",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "i", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;
 
 const GET_DY_INT128_ABI = [
@@ -80,6 +87,24 @@ async function readCoinAddress(
   }
 }
 
+async function readBalance(
+  env: Env,
+  poolAddress: string,
+  index: number,
+  decimals: number
+): Promise<number> {
+  const client = getClient(env);
+
+  const rawBalance = await client.readContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_COINS_ABI,
+    functionName: "balances",
+    args: [BigInt(index)],
+  });
+
+  return Number(rawBalance) / 10 ** decimals;
+}
+
 async function readCoinMetadata(
   env: Env,
   coinAddress: `0x${string}`,
@@ -132,9 +157,15 @@ export async function getCurvePoolSnapshot(
     throw new Error("Failed to read coin metadata");
   }
 
+  const balances = await Promise.all([
+    readBalance(env, poolAddress, coin0.index, coin0.decimals),
+    readBalance(env, poolAddress, coin1.index, coin1.decimals),
+  ]);
+
   return {
     poolAddress,
     coins: [coin0, coin1],
+    balances,
   };
 }
 
