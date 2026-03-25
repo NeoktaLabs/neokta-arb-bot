@@ -16,7 +16,7 @@ export interface PathLeg {
 
 export interface GeneratedPath {
   key: string;
-  type: "same-pool-roundtrip" | "cross-pool-roundtrip";
+  type: "same-pool-roundtrip" | "cross-pool-roundtrip" | "multi-hop-roundtrip";
   sharedTokenSymbol: string;
-  legs: [PathLeg, PathLeg];
+  legs: PathLeg[];
 }
