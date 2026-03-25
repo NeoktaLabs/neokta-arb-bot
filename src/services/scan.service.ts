@@ -26,6 +26,8 @@ import {
 } from "../engine/universe/universe.builder";
 import { discoverCurvePools } from "../integrations/curve/curve.discovery";
 import { logInfo } from "../lib/logger";
+import { buildAlertMessages } from "./alert-builder.service";
+import { sendTelegramAlerts } from "./alert.service";
 
 function summarizeLadder(ladder: any) {
   return {
@@ -316,6 +318,9 @@ export async function runScan(env: Env) {
     },
   };
 
+  const alertMessages = buildAlertMessages(env, output);
+  const alertDelivery = await sendTelegramAlerts(env, alertMessages);
+
   logInfo("Scan result", {
     totalConfiguredPools: output.totalConfiguredPools,
     trustedPools: output.trustedPools.length,
@@ -330,7 +335,17 @@ export async function runScan(env: Env) {
     internalExecutablePaths: output.internalOpportunities.totalExecutablePaths,
     supportedInternal: output.internalOpportunities.supportedCount,
     profitableInternal: output.internalOpportunities.profitableCount,
+    preparedAlerts: alertMessages.length,
+    telegramEnabled: alertDelivery.enabled,
+    telegramSent: alertDelivery.sent,
   });
 
-  return output;
+  return {
+    ...output,
+    alerts: {
+      prepared: alertMessages.length,
+      messages: alertMessages,
+      delivery: alertDelivery,
+    },
+  };
 }
