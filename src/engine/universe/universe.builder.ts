@@ -3,15 +3,6 @@
 import type { DiscoveredCurvePool } from "../../integrations/curve/curve.types";
 import type { ArbCandidate, TokenCluster, TrustedPool } from "./universe.types";
 
-function normalize(symbol: string): string {
-  return symbol.trim().toUpperCase();
-}
-
-function isUsdc(symbol: string): boolean {
-  const s = normalize(symbol);
-  return s === "USDC" || s === "USDCE" || s === "USDC.E";
-}
-
 function isHealthyPoolAddress(
   address: string,
   poolHealth: { address: string; status: string }[]
@@ -34,8 +25,8 @@ export function buildTrustedPools(
     if (!pool.isTwoCoinPool) continue;
     if (!isHealthyPoolAddress(pool.address, poolHealth)) continue;
 
-    const usdcCoin = pool.coins.find((coin) => isUsdc(coin.symbol));
-    const otherCoin = pool.coins.find((coin) => !isUsdc(coin.symbol));
+    const usdcCoin = pool.coins.find((coin) => coin.address === pool.usdcCoinAddress);
+    const otherCoin = pool.coins.find((coin) => coin.address !== pool.usdcCoinAddress);
 
     if (!usdcCoin || !otherCoin) continue;
 
@@ -43,11 +34,13 @@ export function buildTrustedPools(
       address: pool.address,
       name: pool.name,
 
+      usdcAddress: usdcCoin.address,
       usdcSymbol: usdcCoin.symbol,
       usdcIndex: usdcCoin.index,
       usdcDecimals: usdcCoin.decimals,
 
-      token: normalize(otherCoin.symbol),
+      tokenAddress: otherCoin.address,
+      tokenSymbol: otherCoin.symbol,
       tokenIndex: otherCoin.index,
       tokenDecimals: otherCoin.decimals,
     });
@@ -60,19 +53,28 @@ export function buildTokenClusters(pools: TrustedPool[]): TokenCluster[] {
   const map = new Map<string, TrustedPool[]>();
 
   for (const pool of pools) {
-    if (!map.has(pool.token)) {
-      map.set(pool.token, []);
+    const key = pool.tokenAddress.toLowerCase();
+
+    if (!map.has(key)) {
+      map.set(key, []);
     }
 
-    map.get(pool.token)!.push(pool);
+    map.get(key)!.push(pool);
   }
 
-  return Array.from(map.entries()).map(([token, groupedPools]) => ({
-    token,
+  return Array.from(map.entries()).map(([tokenAddress, groupedPools]) => ({
+    tokenAddress: tokenAddress as `0x${string}`,
+    tokenSymbol: groupedPools[0].tokenSymbol,
     pools: groupedPools,
   }));
 }
 
 export function findArbCandidates(clusters: TokenCluster[]): ArbCandidate[] {
-  return clusters.filter((cluster) => cluster.pools.length >= 2);
+  return clusters
+    .filter((cluster) => cluster.pools.length >= 2)
+    .map((cluster) => ({
+      tokenAddress: cluster.tokenAddress,
+      tokenSymbol: cluster.tokenSymbol,
+      pools: cluster.pools,
+    }));
 }
