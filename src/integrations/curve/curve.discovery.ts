@@ -23,6 +23,7 @@ export async function discoverCurvePools(env: Env): Promise<DiscoveredCurvePool[
         name: pool.name,
         address: pool.address,
         coins: snapshot.coins,
+        balances: snapshot.balances,
         hasUsdc: snapshot.coins.some((coin) => isUsdc(coin.symbol)),
         isTwoCoinPool: !thirdCoin,
       };
@@ -37,6 +38,7 @@ export async function discoverCurvePools(env: Env): Promise<DiscoveredCurvePool[
           symbol: coin.symbol,
           decimals: coin.decimals,
         })),
+        balances: snapshot.balances,
         hasUsdc: discovered.hasUsdc,
         isTwoCoinPool: discovered.isTwoCoinPool,
       });
