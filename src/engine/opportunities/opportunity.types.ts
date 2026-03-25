@@ -1,14 +1,19 @@
 // src/engine/opportunities/opportunity.types.ts
 
+import type { Address } from "../../domain/types";
+
 export interface OpportunityCandidate {
   key: string;
-  poolAddress: string;
+  poolAddress: Address;
   poolName: string;
 
   trigger: "internal_imbalance";
   direction: "token0_to_token1" | "token1_to_token0";
 
+  token0Address: Address;
   token0Symbol: string;
+
+  token1Address: Address;
   token1Symbol: string;
 
   imbalancePct: number;
