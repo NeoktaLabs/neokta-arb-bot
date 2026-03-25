@@ -1,15 +1,11 @@
 // src/engine/paths/path.generator.ts
 
-import type { DiscoveredCurvePool } from "../../integrations/curve/curve.discovery";
+import type { DiscoveredCurvePool } from "../../integrations/curve/curve.types";
 import type { GeneratedPath, PathLeg } from "./path.types";
 
-function isUsdc(symbol: string): boolean {
-  return symbol.toUpperCase() === "USDC";
-}
-
 function buildUsdcToTokenLeg(pool: DiscoveredCurvePool): PathLeg | null {
-  const usdcCoin = pool.coins.find((coin) => isUsdc(coin.symbol));
-  const otherCoin = pool.coins.find((coin) => !isUsdc(coin.symbol));
+  const usdcCoin = pool.coins.find((coin) => coin.address === pool.usdcCoinAddress);
+  const otherCoin = pool.coins.find((coin) => coin.address !== pool.usdcCoinAddress);
 
   if (!usdcCoin || !otherCoin) {
     return null;
@@ -18,6 +14,9 @@ function buildUsdcToTokenLeg(pool: DiscoveredCurvePool): PathLeg | null {
   return {
     poolAddress: pool.address,
     poolName: pool.name,
+
+    tokenInAddress: usdcCoin.address,
+    tokenOutAddress: otherCoin.address,
 
     tokenInSymbol: usdcCoin.symbol,
     tokenOutSymbol: otherCoin.symbol,
@@ -31,8 +30,8 @@ function buildUsdcToTokenLeg(pool: DiscoveredCurvePool): PathLeg | null {
 }
 
 function buildTokenToUsdcLeg(pool: DiscoveredCurvePool): PathLeg | null {
-  const usdcCoin = pool.coins.find((coin) => isUsdc(coin.symbol));
-  const otherCoin = pool.coins.find((coin) => !isUsdc(coin.symbol));
+  const usdcCoin = pool.coins.find((coin) => coin.address === pool.usdcCoinAddress);
+  const otherCoin = pool.coins.find((coin) => coin.address !== pool.usdcCoinAddress);
 
   if (!usdcCoin || !otherCoin) {
     return null;
@@ -41,6 +40,9 @@ function buildTokenToUsdcLeg(pool: DiscoveredCurvePool): PathLeg | null {
   return {
     poolAddress: pool.address,
     poolName: pool.name,
+
+    tokenInAddress: otherCoin.address,
+    tokenOutAddress: usdcCoin.address,
 
     tokenInSymbol: otherCoin.symbol,
     tokenOutSymbol: usdcCoin.symbol,
@@ -57,7 +59,6 @@ export function generatePaths(pools: DiscoveredCurvePool[]): GeneratedPath[] {
   const usdcPools = pools.filter((pool) => pool.hasUsdc);
   const paths: GeneratedPath[] = [];
 
-  // Same-pool baseline roundtrips
   for (const pool of usdcPools) {
     const leg1 = buildUsdcToTokenLeg(pool);
     const leg2 = buildTokenToUsdcLeg(pool);
@@ -67,13 +68,14 @@ export function generatePaths(pools: DiscoveredCurvePool[]): GeneratedPath[] {
     }
 
     paths.push({
+      key: ["same", pool.address.toLowerCase(), leg1.tokenOutAddress.toLowerCase()].join(":"),
       type: "same-pool-roundtrip",
+      sharedTokenAddress: leg1.tokenOutAddress,
       sharedTokenSymbol: leg1.tokenOutSymbol,
       legs: [leg1, leg2],
     });
   }
 
-  // Cross-pool roundtrips
   for (let i = 0; i < usdcPools.length; i++) {
     for (let j = 0; j < usdcPools.length; j++) {
       if (i === j) {
@@ -90,12 +92,19 @@ export function generatePaths(pools: DiscoveredCurvePool[]): GeneratedPath[] {
         continue;
       }
 
-      if (leg1.tokenOutSymbol.toUpperCase() !== leg2.tokenInSymbol.toUpperCase()) {
+      if (leg1.tokenOutAddress !== leg2.tokenInAddress) {
         continue;
       }
 
       paths.push({
+        key: [
+          "cross",
+          leg1.tokenOutAddress.toLowerCase(),
+          poolA.address.toLowerCase(),
+          poolB.address.toLowerCase(),
+        ].join(":"),
         type: "cross-pool-roundtrip",
+        sharedTokenAddress: leg1.tokenOutAddress,
         sharedTokenSymbol: leg1.tokenOutSymbol,
         legs: [leg1, leg2],
       });
