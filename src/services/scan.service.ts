@@ -10,6 +10,10 @@ import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
 import { generatePaths } from "../engine/paths/path.generator";
 import { simulatePath } from "../engine/paths/path.simulator";
 import {
+  getDefaultSizeLadder,
+  simulatePathAcrossSizes,
+} from "../engine/sizing/size-ladder";
+import {
   buildTokenClusters,
   buildTrustedPools,
   findArbCandidates,
@@ -17,8 +21,39 @@ import {
 import { discoverCurvePools } from "../integrations/curve/curve.discovery";
 import { logInfo } from "../lib/logger";
 
+function summarizeLadder(ladder: any) {
+  return {
+    key: ladder.key,
+    type: ladder.type,
+    bestOverall: ladder.bestOverall
+      ? {
+          size: ladder.bestOverall.size,
+          pnlUsd: ladder.bestOverall.result.pnlUsd,
+          pnlPct: ladder.bestOverall.result.pnlPct,
+          health: ladder.bestOverall.health,
+        }
+      : null,
+    bestHealthy: ladder.bestHealthy
+      ? {
+          size: ladder.bestHealthy.size,
+          pnlUsd: ladder.bestHealthy.result.pnlUsd,
+          pnlPct: ladder.bestHealthy.result.pnlPct,
+          health: ladder.bestHealthy.health,
+        }
+      : null,
+    curve: ladder.sizes.map((entry: any) => ({
+      size: entry.size,
+      pnlUsd: entry.result?.pnlUsd ?? null,
+      pnlPct: entry.result?.pnlPct ?? null,
+      health: entry.health,
+      healthReasons: entry.healthReasons,
+    })),
+  };
+}
+
 export async function runScan(env: Env) {
   const config = getEnv(env);
+  const sizeLadder = getDefaultSizeLadder();
 
   const discoveredPools = await discoverCurvePools(env);
 
@@ -113,6 +148,49 @@ export async function runScan(env: Env) {
     .filter((result: any) => result.pnlUsd > config.minProfitUsd)
     .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
 
+  // 6. Size ladder analysis
+  const baselineLadders = [];
+  for (const path of baselinePaths) {
+    baselineLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
+  }
+
+  const arbLadders = [];
+  for (const path of arbPaths) {
+    arbLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
+  }
+
+  const multiHopLadders = [];
+  for (const path of multiHopPaths) {
+    multiHopLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
+  }
+
+  const bestBaselineLadders = baselineLadders
+    .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
+    .sort(
+      (a, b) =>
+        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
+        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
+    )
+    .map(summarizeLadder);
+
+  const bestArbLadders = arbLadders
+    .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
+    .sort(
+      (a, b) =>
+        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
+        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
+    )
+    .map(summarizeLadder);
+
+  const bestMultiHopLadders = multiHopLadders
+    .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
+    .sort(
+      (a, b) =>
+        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
+        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
+    )
+    .map(summarizeLadder);
+
   const output = {
     totalConfiguredPools: discoveredPools.length,
     totalTwoCoinPools: twoCoinPools.length,
@@ -160,6 +238,13 @@ export async function runScan(env: Env) {
       suspiciousResults: suspiciousMultiHopResults,
       unsupportedResults: unsupportedMultiHopResults,
     },
+
+    sizeLadder: {
+      testedSizes: sizeLadder,
+      baseline: bestBaselineLadders,
+      arbitrage: bestArbLadders,
+      multiHop: bestMultiHopLadders,
+    },
   };
 
   logInfo("Scan result", {
@@ -171,6 +256,7 @@ export async function runScan(env: Env) {
     multiHopPaths: output.multiHop.totalPaths,
     profitableArb: output.arbitrage.profitableCount,
     profitableMultiHop: output.multiHop.profitableCount,
+    testedSizes: output.sizeLadder.testedSizes,
   });
 
   return output;
