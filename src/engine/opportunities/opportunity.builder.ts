@@ -153,6 +153,7 @@ export function buildExecutableInternalPaths(args: {
   discoveredPools: DiscoveredCurvePool[];
 }): GeneratedPath[] {
   const paths: GeneratedPath[] = [];
+  const seen = new Set<string>();
 
   for (const candidate of args.candidates) {
     const internalPool = args.discoveredPools.find(
@@ -171,6 +172,12 @@ export function buildExecutableInternalPaths(args: {
         ? candidate.token1Symbol
         : candidate.token0Symbol;
 
+    // Ignore trivial constructions where the "entry token" or "exit token"
+    // is already USDC. Those are not real internal arbitrage paths.
+    if (isUsdc(entryToken) || isUsdc(exitToken)) {
+      continue;
+    }
+
     const entryPools = findUsdcPoolsForToken(args.discoveredPools, entryToken);
     const exitPools = findUsdcPoolsForToken(args.discoveredPools, exitToken);
 
@@ -181,12 +188,33 @@ export function buildExecutableInternalPaths(args: {
           const leg2 = buildInternalPoolLeg(internalPool, entryToken, exitToken);
           const leg3 = buildTokenToUsdcLeg(exitPool, exitToken);
 
+          // Avoid degenerate repetition where all legs collapse into the same pool pattern
+          // in a way that doesn't create a distinct USDC -> tokenA -> tokenB -> USDC route.
+          const uniquePoolCount = new Set([
+            leg1.poolAddress.toLowerCase(),
+            leg2.poolAddress.toLowerCase(),
+            leg3.poolAddress.toLowerCase(),
+          ]).size;
+
+          if (uniquePoolCount < 2) {
+            continue;
+          }
+
           const key = [
             candidate.key,
-            entryPool.address.toLowerCase(),
-            internalPool.address.toLowerCase(),
-            exitPool.address.toLowerCase(),
+            leg1.poolAddress.toLowerCase(),
+            leg2.poolAddress.toLowerCase(),
+            leg3.poolAddress.toLowerCase(),
+            `${normalize(leg1.tokenInSymbol)}->${normalize(leg1.tokenOutSymbol)}`,
+            `${normalize(leg2.tokenInSymbol)}->${normalize(leg2.tokenOutSymbol)}`,
+            `${normalize(leg3.tokenInSymbol)}->${normalize(leg3.tokenOutSymbol)}`,
           ].join(":");
+
+          if (seen.has(key)) {
+            continue;
+          }
+
+          seen.add(key);
 
           paths.push({
             key,
