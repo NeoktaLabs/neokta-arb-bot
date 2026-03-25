@@ -1,0 +1,17 @@
+{
+  "name": "neokta-arb-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "viem": "^2.10.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "wrangler": "^4.0.0"
+  }
+}
