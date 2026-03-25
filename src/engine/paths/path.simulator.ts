@@ -1,7 +1,7 @@
 // src/engine/paths/path.simulator.ts
 
 import type { Env } from "../../domain/types";
-import { getCurveDy } from "../../integrations/curve/curve.client";
+import { quoteCurveSwap } from "../../integrations/curve/curve.quote";
 import type { GeneratedPath, PathLeg } from "./path.types";
 
 function toUnits(amount: number, decimals: number): bigint {
@@ -17,13 +17,14 @@ async function simulateLeg(
   leg: PathLeg,
   amountInRaw: bigint
 ): Promise<bigint> {
-  return getCurveDy(
+  return quoteCurveSwap({
     env,
-    leg.poolAddress,
-    leg.tokenInIndex,
-    leg.tokenOutIndex,
-    amountInRaw
-  );
+    poolAddress: leg.poolAddress,
+    i: leg.tokenInIndex,
+    j: leg.tokenOutIndex,
+    dx: amountInRaw,
+    decimalsIn: leg.tokenInDecimals,
+  });
 }
 
 export async function simulatePath(
