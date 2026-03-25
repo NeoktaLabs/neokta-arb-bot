@@ -1,15 +1,25 @@
 // src/engine/paths/multi-hop.generator.ts
 
-import type { GeneratedPath, PathLeg } from "./path.types";
 import type { TokenGraph } from "../graph/graph.types";
+import type { GeneratedPath, PathLeg } from "./path.types";
 
-const MAX_DEPTH = 3; // USDC -> A -> B -> USDC
+const START_TOKEN = "USDC";
+const MAX_DEPTH = 3;
 
 function buildLeg(
-  edge: any,
+  edge: {
+    poolAddress: string;
+    poolName: string;
+    tokenA: string;
+    tokenB: string;
+    indexA: number;
+    indexB: number;
+    decimalsA: number;
+    decimalsB: number;
+  },
   fromToken: string
 ): { leg: PathLeg; nextToken: string } {
-  const isA = edge.tokenA === fromToken;
+  const fromA = edge.tokenA === fromToken;
 
   return {
     leg: {
@@ -17,58 +27,67 @@ function buildLeg(
       poolName: edge.poolName,
 
       tokenInSymbol: fromToken,
-      tokenOutSymbol: isA ? edge.tokenB : edge.tokenA,
+      tokenOutSymbol: fromA ? edge.tokenB : edge.tokenA,
 
-      tokenInIndex: isA ? edge.indexA : edge.indexB,
-      tokenOutIndex: isA ? edge.indexB : edge.indexA,
+      tokenInIndex: fromA ? edge.indexA : edge.indexB,
+      tokenOutIndex: fromA ? edge.indexB : edge.indexA,
 
-      tokenInDecimals: isA ? edge.decimalsA : edge.decimalsB,
-      tokenOutDecimals: isA ? edge.decimalsB : edge.decimalsA,
+      tokenInDecimals: fromA ? edge.decimalsA : edge.decimalsB,
+      tokenOutDecimals: fromA ? edge.decimalsB : edge.decimalsA,
     },
-    nextToken: isA ? edge.tokenB : edge.tokenA,
+    nextToken: fromA ? edge.tokenB : edge.tokenA,
   };
 }
 
 export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
   const paths: GeneratedPath[] = [];
-
-  const start = "USDC";
+  const seen = new Set<string>();
 
   function dfs(
     currentToken: string,
     depth: number,
-    path: PathLeg[],
+    currentLegs: PathLeg[],
     visitedPools: Set<string>
   ) {
     if (depth > MAX_DEPTH) return;
 
-    const edges = graph.adjacency.get(currentToken) || [];
+    const edges = graph.adjacency.get(currentToken) ?? [];
 
     for (const edge of edges) {
       if (visitedPools.has(edge.poolAddress)) continue;
 
       const { leg, nextToken } = buildLeg(edge, currentToken);
 
-      const newPath = [...path, leg];
-      const newVisited = new Set(visitedPools);
-      newVisited.add(edge.poolAddress);
+      const nextLegs = [...currentLegs, leg];
+      const nextVisitedPools = new Set(visitedPools);
+      nextVisitedPools.add(edge.poolAddress);
 
-      // 🎯 LOOP FOUND
-      if (nextToken === start && newPath.length >= 2) {
-        paths.push({
-          key: ["multi", ...newPath.map((l) => l.poolAddress)].join(":"),
-          type: "cross-pool-roundtrip",
-          sharedTokenSymbol: "MULTI",
-          legs: newPath as any,
-        });
+      if (nextToken === START_TOKEN && nextLegs.length >= 2) {
+        const key = [
+          "multi",
+          ...nextLegs.map((item) => item.poolAddress.toLowerCase()),
+          ...nextLegs.map((item) => `${item.tokenInSymbol}->${item.tokenOutSymbol}`),
+        ].join(":");
+
+        if (!seen.has(key)) {
+          seen.add(key);
+
+          paths.push({
+            key,
+            type: "multi-hop-roundtrip",
+            sharedTokenSymbol: "MULTI",
+            legs: nextLegs,
+          });
+        }
+
         continue;
       }
 
-      dfs(nextToken, depth + 1, newPath, newVisited);
+      dfs(nextToken, depth + 1, nextLegs, nextVisitedPools);
     }
   }
 
-  dfs(start, 0, [], new Set());
+  dfs(START_TOKEN, 0, [], new Set());
 
   return paths;
 }
