@@ -1,46 +1,47 @@
 // src/services/scan.service.ts
 
 import type { Env } from "../domain/types";
-import { getEnv } from "../config/env";
-import { getCurveDy } from "../integrations/curve/curve.client";
 import { CURVE_POOLS } from "../integrations/curve/curve.pools";
+import { getCurveDy, getCurvePoolSnapshot } from "../integrations/curve/curve.client";
 import { logInfo } from "../lib/logger";
 
-const USDC_DECIMALS = 6;
-
-function toBigInt(amount: number): bigint {
-  return BigInt(Math.floor(amount * 10 ** USDC_DECIMALS));
+function toUnits(amount: number, decimals: number): bigint {
+  return BigInt(Math.floor(amount * 10 ** decimals));
 }
 
-function fromBigInt(amount: bigint): number {
-  return Number(amount) / 10 ** USDC_DECIMALS;
+function fromUnits(amount: bigint, decimals: number): number {
+  return Number(amount) / 10 ** decimals;
 }
 
 export async function runScan(env: Env) {
-  const config = getEnv(env);
-
   const pool = CURVE_POOLS[0];
 
-  const initial = config.initialUsdc;
-  const dx = toBigInt(initial);
+  const snapshot = await getCurvePoolSnapshot(env, pool.address);
 
-  // USDC -> WXTZ
-  const out1 = await getCurveDy(env, pool.address, 0, 1, dx);
+  const coin0 = snapshot.coins[0];
+  const coin1 = snapshot.coins[1];
 
-  // WXTZ -> USDC
-  const out2 = await getCurveDy(env, pool.address, 1, 0, out1);
+  const testAmount = 1;
+  const dx = toUnits(testAmount, coin0.decimals);
 
-  const finalAmount = fromBigInt(out2);
+  const dy = await getCurveDy(env, pool.address, coin0.index, coin1.index, dx);
+
+  const amountOut = fromUnits(dy, coin1.decimals);
 
   const result = {
     pool: pool.name,
-    initialAmount: initial,
-    finalAmount,
-    pnlUsd: finalAmount - initial,
-    pnlPct: (finalAmount - initial) / initial,
+    poolAddress: pool.address,
+    coin0,
+    coin1,
+    testSwap: {
+      fromSymbol: coin0.symbol,
+      toSymbol: coin1.symbol,
+      amountIn: testAmount,
+      amountOut,
+    },
   };
 
-  logInfo("Curve loop result", result);
+  logInfo("Curve pool test result", result);
 
   return result;
 }
