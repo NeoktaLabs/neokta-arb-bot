@@ -1,11 +1,16 @@
 // src/engine/graph/graph.types.ts
 
+import type { Address } from "../../domain/types";
+
 export interface GraphEdge {
-  poolAddress: string;
+  poolAddress: Address;
   poolName: string;
 
-  tokenA: string;
-  tokenB: string;
+  tokenAAddress: Address;
+  tokenBAddress: Address;
+
+  tokenASymbol: string;
+  tokenBSymbol: string;
 
   indexA: number;
   indexB: number;
@@ -17,4 +22,5 @@ export interface GraphEdge {
 export interface TokenGraph {
   edges: GraphEdge[];
   adjacency: Map<string, GraphEdge[]>;
+  usdcAddresses: Address[];
 }
