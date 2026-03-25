@@ -11,7 +11,11 @@ export async function runScan(env: Env) {
   const config = getEnv(env);
 
   const pools = await discoverCurvePools(env);
-  const paths = generatePaths(pools);
+
+  const twoCoinPools = pools.filter((pool) => pool.isTwoCoinPool);
+  const usdcPools = twoCoinPools.filter((pool) => pool.hasUsdc);
+
+  const paths = generatePaths(usdcPools);
 
   const results = [];
   for (const path of paths) {
@@ -20,14 +24,24 @@ export async function runScan(env: Env) {
   }
 
   const profitable = results.filter((result: any) => {
-    return (
-      typeof result.pnlUsd === "number" &&
-      result.pnlUsd > config.minProfitUsd
-    );
+    return typeof result.pnlUsd === "number" && result.pnlUsd > config.minProfitUsd;
   });
 
   const output = {
-    totalPools: pools.length,
+    totalConfiguredPools: pools.length,
+    totalTwoCoinPools: twoCoinPools.length,
+    totalUsdcTwoCoinPools: usdcPools.length,
+    discoveredPools: pools.map((pool) => ({
+      name: pool.name,
+      address: pool.address,
+      hasUsdc: pool.hasUsdc,
+      isTwoCoinPool: pool.isTwoCoinPool,
+      coins: pool.coins.map((coin) => ({
+        symbol: coin.symbol,
+        decimals: coin.decimals,
+        index: coin.index,
+      })),
+    })),
     totalPaths: paths.length,
     totalSimulations: results.length,
     profitableCount: profitable.length,
@@ -35,7 +49,13 @@ export async function runScan(env: Env) {
     results,
   };
 
-  logInfo("Scan result", output);
+  logInfo("Scan result", {
+    totalConfiguredPools: output.totalConfiguredPools,
+    totalTwoCoinPools: output.totalTwoCoinPools,
+    totalUsdcTwoCoinPools: output.totalUsdcTwoCoinPools,
+    totalPaths: output.totalPaths,
+    profitableCount: output.profitableCount,
+  });
 
   return output;
 }
