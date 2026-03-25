@@ -4,7 +4,7 @@ import { getClient } from "../etherlink/rpc.client";
 import type { Env } from "../../domain/types";
 import type { CurvePoolCoin, CurvePoolSnapshot } from "./curve.types";
 
-const POOL_ABI = [
+const POOL_COINS_ABI = [
   {
     name: "coins",
     type: "function",
@@ -12,6 +12,9 @@ const POOL_ABI = [
     inputs: [{ name: "i", type: "uint256" }],
     outputs: [{ type: "address" }],
   },
+] as const;
+
+const GET_DY_INT128_ABI = [
   {
     name: "get_dy",
     type: "function",
@@ -19,6 +22,20 @@ const POOL_ABI = [
     inputs: [
       { name: "i", type: "int128" },
       { name: "j", type: "int128" },
+      { name: "dx", type: "uint256" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
+
+const GET_DY_UINT256_ABI = [
+  {
+    name: "get_dy",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "i", type: "uint256" },
+      { name: "j", type: "uint256" },
       { name: "dx", type: "uint256" },
     ],
     outputs: [{ type: "uint256" }],
@@ -52,7 +69,7 @@ async function readCoinAddress(
   try {
     const address = await client.readContract({
       address: poolAddress as `0x${string}`,
-      abi: POOL_ABI,
+      abi: POOL_COINS_ABI,
       functionName: "coins",
       args: [BigInt(index)],
     });
@@ -129,7 +146,7 @@ export async function hasThirdCoin(
   return coin2 !== null;
 }
 
-export async function getCurveDy(
+export async function getCurveDyInt128(
   env: Env,
   poolAddress: string,
   i: number,
@@ -140,7 +157,24 @@ export async function getCurveDy(
 
   return client.readContract({
     address: poolAddress as `0x${string}`,
-    abi: POOL_ABI,
+    abi: GET_DY_INT128_ABI,
+    functionName: "get_dy",
+    args: [BigInt(i), BigInt(j), dx],
+  });
+}
+
+export async function getCurveDyUint256(
+  env: Env,
+  poolAddress: string,
+  i: number,
+  j: number,
+  dx: bigint
+): Promise<bigint> {
+  const client = getClient(env);
+
+  return client.readContract({
+    address: poolAddress as `0x${string}`,
+    abi: GET_DY_UINT256_ABI,
     functionName: "get_dy",
     args: [BigInt(i), BigInt(j), dx],
   });
