@@ -15,14 +15,14 @@ function fromUnits(amount: bigint, decimals: number): number {
 async function simulateLeg(
   env: Env,
   leg: PathLeg,
-  amountIn: bigint
+  amountInRaw: bigint
 ): Promise<bigint> {
   return getCurveDy(
     env,
     leg.poolAddress,
     leg.tokenInIndex,
     leg.tokenOutIndex,
-    amountIn
+    amountInRaw
   );
 }
 
@@ -32,47 +32,49 @@ export async function simulatePath(
   initialAmount: number
 ) {
   try {
-    const [leg1, leg2] = path.legs;
+    if (!Array.isArray(path.legs) || path.legs.length < 2) {
+      throw new Error("Path must contain at least 2 legs");
+    }
 
-    const amountInLeg1 = toUnits(initialAmount, leg1.tokenInDecimals);
-    const amountOutLeg1Raw = await simulateLeg(env, leg1, amountInLeg1);
-    const amountOutLeg1 = fromUnits(amountOutLeg1Raw, leg1.tokenOutDecimals);
+    const legResults = [];
 
-    const amountOutLeg2Raw = await simulateLeg(env, leg2, amountOutLeg1Raw);
-    const finalAmount = fromUnits(amountOutLeg2Raw, leg2.tokenOutDecimals);
+    let currentAmountRaw = toUnits(initialAmount, path.legs[0].tokenInDecimals);
+    let currentAmountHuman = initialAmount;
+
+    for (let i = 0; i < path.legs.length; i++) {
+      const leg = path.legs[i];
+
+      const amountOutRaw = await simulateLeg(env, leg, currentAmountRaw);
+      const amountOutHuman = fromUnits(amountOutRaw, leg.tokenOutDecimals);
+
+      legResults.push({
+        pool: leg.poolName,
+        poolAddress: leg.poolAddress,
+        fromSymbol: leg.tokenInSymbol,
+        toSymbol: leg.tokenOutSymbol,
+        amountIn: currentAmountHuman,
+        amountOut: amountOutHuman,
+      });
+
+      currentAmountRaw = amountOutRaw;
+      currentAmountHuman = amountOutHuman;
+    }
+
+    const finalAmount = currentAmountHuman;
 
     return {
+      key: path.key,
       type: path.type,
       sharedTokenSymbol: path.sharedTokenSymbol,
-
       initialAmount,
-      intermediateAmount: amountOutLeg1,
       finalAmount,
-
       pnlUsd: finalAmount - initialAmount,
       pnlPct: (finalAmount - initialAmount) / initialAmount,
-
-      legs: [
-        {
-          pool: leg1.poolName,
-          poolAddress: leg1.poolAddress,
-          fromSymbol: leg1.tokenInSymbol,
-          toSymbol: leg1.tokenOutSymbol,
-          amountIn: initialAmount,
-          amountOut: amountOutLeg1,
-        },
-        {
-          pool: leg2.poolName,
-          poolAddress: leg2.poolAddress,
-          fromSymbol: leg2.tokenInSymbol,
-          toSymbol: leg2.tokenOutSymbol,
-          amountIn: amountOutLeg1,
-          amountOut: finalAmount,
-        },
-      ],
+      legs: legResults,
     };
   } catch (error) {
     return {
+      key: path.key,
       type: path.type,
       sharedTokenSymbol: path.sharedTokenSymbol,
       error: error instanceof Error ? error.message : String(error),
