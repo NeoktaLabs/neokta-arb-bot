@@ -1,6 +1,6 @@
 // src/engine/paths/path.types.ts
 
-export interface GeneratedPath {
+export interface PathLeg {
   poolAddress: string;
   poolName: string;
 
@@ -12,4 +12,10 @@ export interface GeneratedPath {
 
   tokenInDecimals: number;
   tokenOutDecimals: number;
+}
+
+export interface GeneratedPath {
+  type: "same-pool-roundtrip" | "cross-pool-roundtrip";
+  sharedTokenSymbol: string;
+  legs: [PathLeg, PathLeg];
 }
