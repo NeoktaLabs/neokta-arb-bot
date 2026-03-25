@@ -13,6 +13,7 @@ export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
 
   for (const pool of pools) {
     if (!pool.isTwoCoinPool) continue;
+    if (pool.coins.length !== 2) continue;
 
     const [coinA, coinB] = pool.coins;
 
