@@ -9,6 +9,6 @@
     "INITIAL_USDC": "1000",
     "MIN_PROFIT_USD": "5",
     "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com",
-    "USDC_ADDRESS": "0xREPLACE_WITH_REAL_ETHERLINK_USDC_ADDRESS"
+    "USDC_ADDRESS": "0x796Ea11Fa2dD751eD01b53C372fFDB4AAa8f00F9"
   }
 }
