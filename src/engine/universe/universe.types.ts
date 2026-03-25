@@ -1,24 +1,30 @@
 // src/engine/universe/universe.types.ts
 
+import type { Address } from "../../domain/types";
+
 export interface TrustedPool {
-  address: string;
+  address: Address;
   name?: string;
 
+  usdcAddress: Address;
   usdcSymbol: string;
   usdcIndex: number;
   usdcDecimals: number;
 
-  token: string;
+  tokenAddress: Address;
+  tokenSymbol: string;
   tokenIndex: number;
   tokenDecimals: number;
 }
 
 export interface TokenCluster {
-  token: string;
+  tokenAddress: Address;
+  tokenSymbol: string;
   pools: TrustedPool[];
 }
 
 export interface ArbCandidate {
-  token: string;
+  tokenAddress: Address;
+  tokenSymbol: string;
   pools: TrustedPool[];
 }
