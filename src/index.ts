@@ -1,9 +1,10 @@
 // src/index.ts
 
+import type { Env } from "./domain/types";
 import { runScan } from "./services/scan.service";
 
 export default {
-  async fetch(request: Request, env: any) {
+  async fetch(_request: Request, env: Env) {
     try {
       const result = await runScan(env);
 
@@ -14,7 +15,7 @@ export default {
     } catch (error) {
       return Response.json({
         ok: false,
-        error: String(error),
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   },
