@@ -4,8 +4,7 @@ import type { CurvePoolConfig } from "./curve.types";
 
 export const CURVE_POOLS: CurvePoolConfig[] = [
   {
-    name: "Example Pool",
-    address: "0x78051fbf40581619ffaadb6cd7e5856d4a327a6d",
-    coins: ["USDC", "WXTZ"], // index 0, 1
+    name: "Curve Etherlink Test Pool",
+    address: "0x0714027e44802b2ff76389daf5371990cc3a4c24",
   },
 ];
