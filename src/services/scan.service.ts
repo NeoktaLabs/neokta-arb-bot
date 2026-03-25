@@ -73,7 +73,6 @@ export async function runScan(env: Env) {
   const twoCoinPools = discoveredPools.filter((pool) => pool.isTwoCoinPool);
   const usdcPools = twoCoinPools.filter((pool) => pool.hasUsdc);
 
-  // 1. Baseline same-pool paths
   const baselinePaths = generatePaths(usdcPools);
 
   const baselineRawResults = [];
@@ -98,15 +97,12 @@ export async function runScan(env: Env) {
     (result: any) => result.health === "unsupported"
   );
 
-  // 2. Pool health from baseline behavior
   const poolHealth = buildPoolHealthSummaries(baselineRawResults);
 
-  // 3. Trusted universe from healthy pools
   const trustedPools = buildTrustedPools(discoveredPools, poolHealth);
   const tokenClusters = buildTokenClusters(trustedPools);
   const arbCandidates = findArbCandidates(tokenClusters);
 
-  // 4. Cross-pool same-token arbitrage paths
   const arbPaths = generateArbPaths(arbCandidates);
 
   const arbResults = [];
@@ -130,7 +126,6 @@ export async function runScan(env: Env) {
     .filter((result: any) => result.pnlUsd > config.minProfitUsd)
     .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
 
-  // 5. Multi-hop graph paths
   const graph = buildTokenGraph(discoveredPools);
   const multiHopPaths = generateMultiHopPaths(graph);
 
@@ -161,7 +156,6 @@ export async function runScan(env: Env) {
     .filter((result: any) => result.pnlUsd > config.minProfitUsd)
     .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
 
-  // 6. Size ladder analysis
   const baselineLadders = [];
   for (const path of baselinePaths) {
     baselineLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
@@ -204,7 +198,6 @@ export async function runScan(env: Env) {
     )
     .map(summarizeLadder);
 
-  // 7. Internal imbalance monitoring
   const imbalanceTargets = discoveredPools.filter((pool) => pool.isTwoCoinPool);
 
   const imbalanceReports = [];
@@ -218,8 +211,12 @@ export async function runScan(env: Env) {
     );
   }
 
-  // 8. Executable opportunities from internal imbalance
-  const internalCandidates = buildInternalImbalanceCandidates(imbalanceReports, 15);
+  const internalCandidates = buildInternalImbalanceCandidates(
+    imbalanceReports,
+    15,
+    discoveredPools
+  );
+
   const internalExecutablePaths = buildExecutableInternalPaths({
     candidates: internalCandidates,
     discoveredPools,
