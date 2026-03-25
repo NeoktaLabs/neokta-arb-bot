@@ -9,6 +9,13 @@ import { simulatePath } from "../engine/paths/path.simulator";
 import { discoverCurvePools } from "../integrations/curve/curve.discovery";
 import { logInfo } from "../lib/logger";
 
+// NEW
+import {
+  buildTrustedPools,
+  buildTokenClusters,
+  findArbCandidates,
+} from "../engine/universe/universe.builder";
+
 export async function runScan(env: Env) {
   const config = getEnv(env);
 
@@ -31,34 +38,25 @@ export async function runScan(env: Env) {
     });
   }
 
-  const healthyResults = rawResults.filter((result: any) => result.health === "healthy");
-  const suspiciousResults = rawResults.filter((result: any) => result.health === "suspicious");
-  const unsupportedResults = rawResults.filter((result: any) => result.health === "unsupported");
+  const healthyResults = rawResults.filter((r: any) => r.health === "healthy");
+  const suspiciousResults = rawResults.filter((r: any) => r.health === "suspicious");
+  const unsupportedResults = rawResults.filter((r: any) => r.health === "unsupported");
 
-  const profitable = healthyResults.filter((result: any) => {
-    return typeof result.pnlUsd === "number" && result.pnlUsd > config.minProfitUsd;
+  const profitable = healthyResults.filter((r: any) => {
+    return typeof r.pnlUsd === "number" && r.pnlUsd > config.minProfitUsd;
   });
 
   const poolHealth = buildPoolHealthSummaries(rawResults);
+
+  // 🧠 NEW — UNIVERSE
+  const trustedPools = buildTrustedPools(healthyResults);
+  const tokenClusters = buildTokenClusters(trustedPools);
+  const arbCandidates = findArbCandidates(tokenClusters);
 
   const output = {
     totalConfiguredPools: pools.length,
     totalTwoCoinPools: twoCoinPools.length,
     totalUsdcTwoCoinPools: usdcPools.length,
-
-    discoveredPools: pools.map((pool) => ({
-      name: pool.name,
-      address: pool.address,
-      hasUsdc: pool.hasUsdc,
-      isTwoCoinPool: pool.isTwoCoinPool,
-      coins: pool.coins.map((coin) => ({
-        symbol: coin.symbol,
-        decimals: coin.decimals,
-        index: coin.index,
-      })),
-    })),
-
-    poolHealth,
 
     totalPaths: paths.length,
     totalSimulations: rawResults.length,
@@ -67,23 +65,22 @@ export async function runScan(env: Env) {
     suspiciousCount: suspiciousResults.length,
     unsupportedCount: unsupportedResults.length,
 
+    poolHealth,
+
+    // 🧠 NEW OUTPUT
+    trustedPools,
+    tokenClusters,
+    arbCandidates,
+
     profitableCount: profitable.length,
     profitable,
-
-    healthyResults,
-    suspiciousResults,
-    unsupportedResults,
   };
 
   logInfo("Scan result", {
     totalConfiguredPools: output.totalConfiguredPools,
-    totalTwoCoinPools: output.totalTwoCoinPools,
-    totalUsdcTwoCoinPools: output.totalUsdcTwoCoinPools,
     totalPaths: output.totalPaths,
     healthyCount: output.healthyCount,
-    suspiciousCount: output.suspiciousCount,
-    unsupportedCount: output.unsupportedCount,
-    profitableCount: output.profitableCount,
+    arbCandidates: output.arbCandidates.length,
   });
 
   return output;
