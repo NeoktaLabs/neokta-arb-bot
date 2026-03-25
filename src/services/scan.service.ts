@@ -6,6 +6,8 @@ import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter"
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
 import { buildTokenGraph } from "../engine/graph/graph.builder";
 import { monitorPoolImbalance } from "../engine/imbalance/imbalance.monitor";
+import { buildExecutableInternalPaths, buildInternalImbalanceCandidates } from "../engine/opportunities/opportunity.builder";
+import { evaluateOpportunityPaths } from "../engine/opportunities/opportunity.evaluator";
 import { generateArbPaths } from "../engine/paths/arb-path.generator";
 import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
 import { generatePaths } from "../engine/paths/path.generator";
@@ -24,7 +26,6 @@ import { logInfo } from "../lib/logger";
 
 function summarizeLadder(ladder: any) {
   return {
-    key: ladder.key,
     type: ladder.type,
     bestOverall: ladder.bestOverall
       ? {
@@ -193,10 +194,7 @@ export async function runScan(env: Env) {
     .map(summarizeLadder);
 
   // 7. Internal imbalance monitoring
-  const imbalanceTargets = discoveredPools.filter((pool) => {
-    const symbols = pool.coins.map((coin) => coin.symbol.toUpperCase());
-    return symbols.includes("STXTZ") && symbols.includes("WXTZ");
-  });
+  const imbalanceTargets = discoveredPools.filter((pool) => pool.isTwoCoinPool);
 
   const imbalanceReports = [];
   for (const pool of imbalanceTargets) {
@@ -208,6 +206,27 @@ export async function runScan(env: Env) {
       })
     );
   }
+
+  // 8. Executable opportunities from internal imbalance
+  const internalCandidates = buildInternalImbalanceCandidates(imbalanceReports, 15);
+  const internalExecutablePaths = buildExecutableInternalPaths({
+    candidates: internalCandidates,
+    discoveredPools,
+  });
+
+  const internalOpportunityEvaluations = await evaluateOpportunityPaths({
+    env,
+    candidates: internalCandidates,
+    paths: internalExecutablePaths,
+    sizeLadder,
+  });
+
+  const profitableInternalOpportunities = internalOpportunityEvaluations.filter(
+    (entry) =>
+      entry.bestHealthy &&
+      typeof entry.bestHealthy.pnlUsd === "number" &&
+      entry.bestHealthy.pnlUsd > config.minProfitUsd
+  );
 
   const output = {
     totalConfiguredPools: discoveredPools.length,
@@ -268,6 +287,14 @@ export async function runScan(env: Env) {
       totalTargets: imbalanceTargets.length,
       reports: imbalanceReports,
     },
+
+    internalOpportunities: {
+      totalCandidates: internalCandidates.length,
+      totalExecutablePaths: internalExecutablePaths.length,
+      profitableCount: profitableInternalOpportunities.length,
+      profitable: profitableInternalOpportunities,
+      evaluations: internalOpportunityEvaluations,
+    },
   };
 
   logInfo("Scan result", {
@@ -280,6 +307,9 @@ export async function runScan(env: Env) {
     profitableArb: output.arbitrage.profitableCount,
     profitableMultiHop: output.multiHop.profitableCount,
     imbalanceTargets: output.imbalanceMonitoring.totalTargets,
+    internalCandidates: output.internalOpportunities.totalCandidates,
+    internalExecutablePaths: output.internalOpportunities.totalExecutablePaths,
+    profitableInternal: output.internalOpportunities.profitableCount,
   });
 
   return output;
