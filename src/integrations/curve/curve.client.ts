@@ -42,55 +42,91 @@ const ERC20_ABI = [
   },
 ] as const;
 
+async function readCoinAddress(
+  env: Env,
+  poolAddress: string,
+  index: number
+): Promise<`0x${string}` | null> {
+  const client = getClient(env);
+
+  try {
+    const address = await client.readContract({
+      address: poolAddress as `0x${string}`,
+      abi: POOL_ABI,
+      functionName: "coins",
+      args: [BigInt(index)],
+    });
+
+    return address;
+  } catch {
+    return null;
+  }
+}
+
+async function readCoinMetadata(
+  env: Env,
+  coinAddress: `0x${string}`,
+  index: number
+): Promise<CurvePoolCoin | null> {
+  const client = getClient(env);
+
+  try {
+    const [symbol, decimals] = await Promise.all([
+      client.readContract({
+        address: coinAddress,
+        abi: ERC20_ABI,
+        functionName: "symbol",
+      }),
+      client.readContract({
+        address: coinAddress,
+        abi: ERC20_ABI,
+        functionName: "decimals",
+      }),
+    ]);
+
+    return {
+      index,
+      address: coinAddress,
+      symbol,
+      decimals: Number(decimals),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurvePoolSnapshot(
   env: Env,
   poolAddress: string
 ): Promise<CurvePoolSnapshot> {
-  const client = getClient(env);
+  const coin0Address = await readCoinAddress(env, poolAddress, 0);
+  const coin1Address = await readCoinAddress(env, poolAddress, 1);
 
-  const coinAddresses = await Promise.all([
-    client.readContract({
-      address: poolAddress as `0x${string}`,
-      abi: POOL_ABI,
-      functionName: "coins",
-      args: [0n],
-    }),
-    client.readContract({
-      address: poolAddress as `0x${string}`,
-      abi: POOL_ABI,
-      functionName: "coins",
-      args: [1n],
-    }),
+  if (!coin0Address || !coin1Address) {
+    throw new Error("Pool does not expose 2 readable coin slots");
+  }
+
+  const [coin0, coin1] = await Promise.all([
+    readCoinMetadata(env, coin0Address, 0),
+    readCoinMetadata(env, coin1Address, 1),
   ]);
 
-  const coins: CurvePoolCoin[] = await Promise.all(
-    coinAddresses.map(async (coinAddress, index) => {
-      const [symbol, decimals] = await Promise.all([
-        client.readContract({
-          address: coinAddress,
-          abi: ERC20_ABI,
-          functionName: "symbol",
-        }),
-        client.readContract({
-          address: coinAddress,
-          abi: ERC20_ABI,
-          functionName: "decimals",
-        }),
-      ]);
-
-      return {
-        index,
-        address: coinAddress,
-        symbol,
-        decimals: Number(decimals),
-      };
-    })
-  );
+  if (!coin0 || !coin1) {
+    throw new Error("Failed to read coin metadata");
+  }
 
   return {
     poolAddress,
-    coins,
+    coins: [coin0, coin1],
   };
+}
+
+export async function hasThirdCoin(
+  env: Env,
+  poolAddress: string
+): Promise<boolean> {
+  const coin2 = await readCoinAddress(env, poolAddress, 2);
+  return coin2 !== null;
 }
 
 export async function getCurveDy(
