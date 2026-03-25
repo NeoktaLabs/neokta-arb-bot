@@ -3,13 +3,10 @@
 import type { DiscoveredCurvePool } from "../../integrations/curve/curve.types";
 import type { GraphEdge, TokenGraph } from "./graph.types";
 
-function normalize(symbol: string): string {
-  return symbol.trim().toUpperCase();
-}
-
 export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
   const edges: GraphEdge[] = [];
   const adjacency = new Map<string, GraphEdge[]>();
+  const usdcAddresses = new Set<string>();
 
   for (const pool of pools) {
     if (!pool.isTwoCoinPool) continue;
@@ -21,8 +18,11 @@ export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
       poolAddress: pool.address,
       poolName: pool.name ?? pool.address,
 
-      tokenA: normalize(coinA.symbol),
-      tokenB: normalize(coinB.symbol),
+      tokenAAddress: coinA.address,
+      tokenBAddress: coinB.address,
+
+      tokenASymbol: coinA.symbol,
+      tokenBSymbol: coinB.symbol,
 
       indexA: coinA.index,
       indexB: coinB.index,
@@ -33,12 +33,23 @@ export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
 
     edges.push(edge);
 
-    if (!adjacency.has(edge.tokenA)) adjacency.set(edge.tokenA, []);
-    if (!adjacency.has(edge.tokenB)) adjacency.set(edge.tokenB, []);
+    const aKey = edge.tokenAAddress.toLowerCase();
+    const bKey = edge.tokenBAddress.toLowerCase();
 
-    adjacency.get(edge.tokenA)!.push(edge);
-    adjacency.get(edge.tokenB)!.push(edge);
+    if (!adjacency.has(aKey)) adjacency.set(aKey, []);
+    if (!adjacency.has(bKey)) adjacency.set(bKey, []);
+
+    adjacency.get(aKey)!.push(edge);
+    adjacency.get(bKey)!.push(edge);
+
+    if (pool.usdcCoinAddress) {
+      usdcAddresses.add(pool.usdcCoinAddress.toLowerCase());
+    }
   }
 
-  return { edges, adjacency };
+  return {
+    edges,
+    adjacency,
+    usdcAddresses: Array.from(usdcAddresses) as `0x${string}`[],
+  };
 }
