@@ -6,7 +6,10 @@ import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter"
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
 import { buildTokenGraph } from "../engine/graph/graph.builder";
 import { monitorPoolImbalance } from "../engine/imbalance/imbalance.monitor";
-import { buildExecutableInternalPaths, buildInternalImbalanceCandidates } from "../engine/opportunities/opportunity.builder";
+import {
+  buildExecutableInternalPaths,
+  buildInternalImbalanceCandidates,
+} from "../engine/opportunities/opportunity.builder";
 import { evaluateOpportunityPaths } from "../engine/opportunities/opportunity.evaluator";
 import { generateArbPaths } from "../engine/paths/arb-path.generator";
 import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
@@ -51,6 +54,14 @@ function summarizeLadder(ladder: any) {
       healthReasons: entry.healthReasons,
     })),
   };
+}
+
+function isUnsupportedEvaluation(entry: any): boolean {
+  if (!Array.isArray(entry?.curve) || entry.curve.length === 0) {
+    return true;
+  }
+
+  return entry.curve.every((point: any) => point.health === "unsupported");
 }
 
 export async function runScan(env: Env) {
@@ -214,14 +225,22 @@ export async function runScan(env: Env) {
     discoveredPools,
   });
 
-  const internalOpportunityEvaluations = await evaluateOpportunityPaths({
+  const rawInternalOpportunityEvaluations = await evaluateOpportunityPaths({
     env,
     candidates: internalCandidates,
     paths: internalExecutablePaths,
     sizeLadder,
   });
 
-  const profitableInternalOpportunities = internalOpportunityEvaluations.filter(
+  const supportedInternalEvaluations = rawInternalOpportunityEvaluations.filter(
+    (entry) => !isUnsupportedEvaluation(entry)
+  );
+
+  const unsupportedInternalEvaluations = rawInternalOpportunityEvaluations.filter(
+    (entry) => isUnsupportedEvaluation(entry)
+  );
+
+  const profitableInternalOpportunities = supportedInternalEvaluations.filter(
     (entry) =>
       entry.bestHealthy &&
       typeof entry.bestHealthy.pnlUsd === "number" &&
@@ -291,9 +310,12 @@ export async function runScan(env: Env) {
     internalOpportunities: {
       totalCandidates: internalCandidates.length,
       totalExecutablePaths: internalExecutablePaths.length,
+      supportedCount: supportedInternalEvaluations.length,
+      unsupportedCount: unsupportedInternalEvaluations.length,
       profitableCount: profitableInternalOpportunities.length,
       profitable: profitableInternalOpportunities,
-      evaluations: internalOpportunityEvaluations,
+      supportedEvaluations: supportedInternalEvaluations,
+      unsupportedEvaluations: unsupportedInternalEvaluations,
     },
   };
 
@@ -309,6 +331,7 @@ export async function runScan(env: Env) {
     imbalanceTargets: output.imbalanceMonitoring.totalTargets,
     internalCandidates: output.internalOpportunities.totalCandidates,
     internalExecutablePaths: output.internalOpportunities.totalExecutablePaths,
+    supportedInternal: output.internalOpportunities.supportedCount,
     profitableInternal: output.internalOpportunities.profitableCount,
   });
 
