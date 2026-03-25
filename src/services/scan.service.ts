@@ -4,8 +4,10 @@ import type { Env } from "../domain/types";
 import { getEnv } from "../config/env";
 import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter";
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
-import { generatePaths } from "../engine/paths/path.generator";
+import { buildTokenGraph } from "../engine/graph/graph.builder";
 import { generateArbPaths } from "../engine/paths/arb-path.generator";
+import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
+import { generatePaths } from "../engine/paths/path.generator";
 import { simulatePath } from "../engine/paths/path.simulator";
 import {
   buildTokenClusters,
@@ -23,7 +25,7 @@ export async function runScan(env: Env) {
   const twoCoinPools = discoveredPools.filter((pool) => pool.isTwoCoinPool);
   const usdcPools = twoCoinPools.filter((pool) => pool.hasUsdc);
 
-  // Baseline same-pool paths
+  // 1. Baseline same-pool paths
   const baselinePaths = generatePaths(usdcPools);
 
   const baselineRawResults = [];
@@ -48,14 +50,15 @@ export async function runScan(env: Env) {
     (result: any) => result.health === "unsupported"
   );
 
+  // 2. Pool health from baseline behavior
   const poolHealth = buildPoolHealthSummaries(baselineRawResults);
 
-  // Trusted universe
+  // 3. Trusted universe from healthy pools
   const trustedPools = buildTrustedPools(discoveredPools, poolHealth);
   const tokenClusters = buildTokenClusters(trustedPools);
   const arbCandidates = findArbCandidates(tokenClusters);
 
-  // Cross-pool arbitrage paths
+  // 4. Cross-pool same-token arbitrage paths
   const arbPaths = generateArbPaths(arbCandidates);
 
   const arbResults = [];
@@ -75,6 +78,37 @@ export async function runScan(env: Env) {
   const unsupportedArbResults = arbResults.filter((result: any) => result.health === "unsupported");
 
   const profitableArbResults = healthyArbResults
+    .filter((result: any) => typeof result.pnlUsd === "number")
+    .filter((result: any) => result.pnlUsd > config.minProfitUsd)
+    .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
+
+  // 5. Multi-hop graph paths
+  const graph = buildTokenGraph(discoveredPools);
+  const multiHopPaths = generateMultiHopPaths(graph);
+
+  const multiHopResults = [];
+  for (const path of multiHopPaths) {
+    const simulation = await simulatePath(env, path, config.initialUsdc);
+    const classification = classifySimulationResult(simulation);
+
+    multiHopResults.push({
+      ...simulation,
+      health: classification.health,
+      healthReasons: classification.reasons,
+    });
+  }
+
+  const healthyMultiHopResults = multiHopResults.filter(
+    (result: any) => result.health === "healthy"
+  );
+  const suspiciousMultiHopResults = multiHopResults.filter(
+    (result: any) => result.health === "suspicious"
+  );
+  const unsupportedMultiHopResults = multiHopResults.filter(
+    (result: any) => result.health === "unsupported"
+  );
+
+  const profitableMultiHopResults = healthyMultiHopResults
     .filter((result: any) => typeof result.pnlUsd === "number")
     .filter((result: any) => result.pnlUsd > config.minProfitUsd)
     .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
@@ -113,6 +147,19 @@ export async function runScan(env: Env) {
       suspiciousResults: suspiciousArbResults,
       unsupportedResults: unsupportedArbResults,
     },
+
+    multiHop: {
+      totalPaths: multiHopPaths.length,
+      totalSimulations: multiHopResults.length,
+      healthyCount: healthyMultiHopResults.length,
+      suspiciousCount: suspiciousMultiHopResults.length,
+      unsupportedCount: unsupportedMultiHopResults.length,
+      profitableCount: profitableMultiHopResults.length,
+      profitable: profitableMultiHopResults,
+      healthyResults: healthyMultiHopResults,
+      suspiciousResults: suspiciousMultiHopResults,
+      unsupportedResults: unsupportedMultiHopResults,
+    },
   };
 
   logInfo("Scan result", {
@@ -121,7 +168,9 @@ export async function runScan(env: Env) {
     arbCandidates: output.arbCandidates.length,
     baselinePaths: output.baseline.totalPaths,
     arbPaths: output.arbitrage.totalPaths,
+    multiHopPaths: output.multiHop.totalPaths,
     profitableArb: output.arbitrage.profitableCount,
+    profitableMultiHop: output.multiHop.profitableCount,
   });
 
   return output;
