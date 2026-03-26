@@ -23,7 +23,7 @@
     "INITIAL_USDC": "1000",
 
     // =========================
-    // ETHERLINK (CURRENT)
+    // ETHERLINK
     // =========================
 
     "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com",
@@ -32,29 +32,37 @@
     "OKU_QUOTER_V2_ADDRESS": "0xaa52bB8110fE38D0d2d2AF0B85C3A3eE622CA455",
 
     // =========================
-    // ETHEREUM (NEW)
+    // ETHEREUM
     // =========================
 
     "ENABLE_ETHEREUM": "true",
-    "ETHEREUM_RPC_URL": "https://ethereum-mainnet.gateway.tatum.io",
+    "ETHEREUM_RPC_URL": "https://eth.llamarpc.com",
     "ETHEREUM_USDC_ADDRESS": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 
-    // Uniswap V3 (Ethereum)
     "ENABLE_UNISWAP": "true",
     "ETHEREUM_UNISWAP_FACTORY_ADDRESS": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
     "ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
 
     // =========================
-    // STRATEGY CONFIG
+    // STRATEGY
     // =========================
 
-    // 🔥 Ladder (optimized)
     "LADDER_SIZES": "1000",
 
-    // Profit thresholds
     "MIN_ALERT_PROFIT_USD": "0",
     "MIN_CONFIDENT_PROFIT_USD": "0.25",
     "MIN_PROFIT_USD": "0.25",
+
+    // =========================
+    // RPC GUARD (IMPORTANT)
+    // =========================
+
+    "RPC_MAX_CONCURRENCY": "1",
+    "RPC_MIN_INTERVAL_MS": "200",
+    "RPC_MAX_RETRIES": "3",
+    "RPC_BASE_BACKOFF_MS": "500",
+    "RPC_MAX_BACKOFF_MS": "3000",
+    "RPC_JITTER_MS": "250",
 
     // =========================
     // ALERTING
