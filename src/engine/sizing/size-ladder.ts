@@ -1,5 +1,6 @@
 // src/engine/sizing/size-ladder.ts
 
+import { getEnv } from "../../config/env";
 import type { Env } from "../../domain/types";
 import { isProfitablePnl } from "../pnl/pnl.service";
 import { classifySimulationResult } from "../filters/result-quality.filter";
@@ -30,18 +31,24 @@ export interface PathLadderSummary {
   bestProfitable: ProfitableSizedSimulation | null;
 }
 
-export function getDefaultSizeLadder(): number[] {
-  return [1, 10, 100, 250, 500, 1000];
+export function getDefaultSizeLadder(env?: Env): number[] {
+  if (!env) {
+    return [100, 1000];
+  }
+
+  const config = getEnv(env);
+  return config.ladderSizes.length > 0 ? config.ladderSizes : [100, 1000];
 }
 
 export async function simulatePathAcrossSizes(
   env: Env,
   path: GeneratedPath,
-  sizes: number[]
+  sizes: number[] = getDefaultSizeLadder(env)
 ): Promise<PathLadderSummary> {
+  const ladderSizes = sizes.length > 0 ? sizes : getDefaultSizeLadder(env);
   const ladderResults: SizedSimulationResult[] = [];
 
-  for (const size of sizes) {
+  for (const size of ladderSizes) {
     const result = await simulatePath(env, path, size);
     const classification = classifySimulationResult(result);
 
