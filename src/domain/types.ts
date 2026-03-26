@@ -10,6 +10,9 @@ export interface Env {
   MIN_CONFIDENT_PROFIT_USD?: string;
   USDC_ADDRESS?: string;
 
+  ENABLE_OKU?: string;
+  OKU_QUOTER_V2_ADDRESS?: string;
+
   ENABLE_TELEGRAM_ALERTS?: string;
   ENABLE_NEAR_MISS_ALERTS?: string;
   ENABLE_IMBALANCE_ALERTS?: string;

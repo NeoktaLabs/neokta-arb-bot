@@ -2,7 +2,6 @@
 
 import type { Env } from "../../domain/types";
 import { classifySimulationResult } from "../filters/result-quality.filter";
-import { isPositiveNetPnl } from "../pnl/pnl.service";
 import type { GeneratedPath } from "../paths/path.types";
 import { simulatePath } from "../paths/path.simulator";
 
@@ -45,37 +44,23 @@ export async function simulatePathAcrossSizes(
     });
   }
 
-  const resultsWithPnl = ladderResults.filter(
-    (entry) => typeof entry.result?.pnlUsd === "number"
-  );
-
-  const healthyResults = resultsWithPnl.filter(
-    (entry) => entry.health === "healthy"
-  );
-
-  const positiveResults = healthyResults.filter((entry) =>
-    isPositiveNetPnl(entry.result?.pnlUsd, { minAlertProfitUsd: 0 })
-  );
+  const resultsWithPnl = ladderResults.filter((entry) => typeof entry.result?.pnlUsd === "number");
+  const healthyResults = resultsWithPnl.filter((entry) => entry.health === "healthy");
+  const positiveResults = healthyResults.filter((entry) => (entry.result.pnlUsd as number) > 0);
 
   const bestOverall =
     resultsWithPnl.length > 0
-      ? [...resultsWithPnl].sort(
-          (a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number)
-        )[0]
+      ? [...resultsWithPnl].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
       : null;
 
   const bestHealthy =
     healthyResults.length > 0
-      ? [...healthyResults].sort(
-          (a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number)
-        )[0]
+      ? [...healthyResults].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
       : null;
 
   const bestPositive =
     positiveResults.length > 0
-      ? [...positiveResults].sort(
-          (a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number)
-        )[0]
+      ? [...positiveResults].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
       : null;
 
   return {

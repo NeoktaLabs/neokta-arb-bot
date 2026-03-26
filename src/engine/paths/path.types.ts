@@ -1,8 +1,10 @@
 // src/engine/paths/path.types.ts
 
 import type { Address } from "../../domain/types";
+import type { VenueId } from "../../domain/markets";
 
 export interface PathLeg {
+  venue: VenueId;
   poolAddress: Address;
   poolName: string;
 
@@ -12,8 +14,9 @@ export interface PathLeg {
   tokenInSymbol: string;
   tokenOutSymbol: string;
 
-  tokenInIndex: number;
-  tokenOutIndex: number;
+  tokenInIndex?: number;
+  tokenOutIndex?: number;
+  fee?: number;
 
   tokenInDecimals: number;
   tokenOutDecimals: number;

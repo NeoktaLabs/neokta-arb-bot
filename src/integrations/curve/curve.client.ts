@@ -163,7 +163,7 @@ export async function getCurvePoolSnapshot(
   ]);
 
   return {
-    poolAddress,
+    poolAddress: poolAddress as `0x${string}`,
     coins: [coin0, coin1],
     balances,
   };
@@ -191,7 +191,7 @@ export async function getCurveDyInt128(
     abi: GET_DY_INT128_ABI,
     functionName: "get_dy",
     args: [BigInt(i), BigInt(j), dx],
-  });
+  }) as Promise<bigint>;
 }
 
 export async function getCurveDyUint256(
@@ -208,5 +208,5 @@ export async function getCurveDyUint256(
     abi: GET_DY_UINT256_ABI,
     functionName: "get_dy",
     args: [BigInt(i), BigInt(j), dx],
-  });
+  }) as Promise<bigint>;
 }

@@ -1,66 +1,58 @@
 // src/engine/paths/path.simulator.ts
 
 import type { Env } from "../../domain/types";
+import { getEnv } from "../../config/env";
 import { quoteCurveSwap } from "../../integrations/curve/curve.quote";
+import { quoteOkuSwap } from "../../integrations/oku/oku.quote";
 import type { GeneratedPath, PathLeg } from "./path.types";
 
 function toUnits(amount: number, decimals: number): bigint {
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`Invalid human amount: ${amount}`);
-  }
-
-  if (!Number.isInteger(decimals) || decimals < 0) {
-    throw new Error(`Invalid decimals: ${decimals}`);
-  }
-
-  const [wholePartRaw, fractionalPartRaw = ""] = amount.toString().split(".");
-  const wholePart = wholePartRaw.replace(/[^\d-]/g, "");
-  const fractionalPart = fractionalPartRaw.replace(/\D/g, "").slice(0, decimals);
-  const paddedFractional = fractionalPart.padEnd(decimals, "0");
-  const sign = wholePart.startsWith("-") ? -1n : 1n;
-  const wholeDigits = wholePart.replace("-", "") || "0";
-  const base = 10n ** BigInt(decimals);
-  const units = BigInt(wholeDigits) * base + BigInt(paddedFractional || "0");
-
-  return sign * units;
+  const [wholeRaw, fractionRaw = ""] = amount.toFixed(decimals + 2).split(".");
+  const whole = BigInt(wholeRaw);
+  const fraction = BigInt((fractionRaw.slice(0, decimals) || "").padEnd(decimals, "0"));
+  return whole * 10n ** BigInt(decimals) + fraction;
 }
 
 function fromUnits(amount: bigint, decimals: number): number {
-  if (!Number.isInteger(decimals) || decimals < 0) {
-    throw new Error(`Invalid decimals: ${decimals}`);
-  }
-
-  const sign = amount < 0n ? -1 : 1;
-  const absolute = amount < 0n ? -amount : amount;
   const base = 10n ** BigInt(decimals);
-  const whole = absolute / base;
-  const fraction = absolute % base;
-  const fractionString = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
-  const value = fractionString.length > 0 ? `${whole.toString()}.${fractionString}` : whole.toString();
-
-  return Number(value) * sign;
+  const whole = amount / base;
+  const fraction = amount % base;
+  const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 8);
+  return Number(`${whole.toString()}.${fractionStr || "0"}`);
 }
 
-async function simulateLeg(
-  env: Env,
-  leg: PathLeg,
-  amountInRaw: bigint
-): Promise<bigint> {
-  return quoteCurveSwap({
+async function simulateLeg(env: Env, leg: PathLeg, amountInRaw: bigint): Promise<bigint> {
+  if (leg.venue === "curve") {
+    if (typeof leg.tokenInIndex !== "number" || typeof leg.tokenOutIndex !== "number") {
+      throw new Error("Curve leg is missing token indexes");
+    }
+
+    return quoteCurveSwap({
+      env,
+      poolAddress: leg.poolAddress,
+      i: leg.tokenInIndex,
+      j: leg.tokenOutIndex,
+      dx: amountInRaw,
+      decimalsIn: leg.tokenInDecimals,
+    });
+  }
+
+  const config = getEnv(env);
+  if (typeof leg.fee !== "number") {
+    throw new Error("Oku leg is missing pool fee");
+  }
+
+  return quoteOkuSwap({
     env,
-    poolAddress: leg.poolAddress,
-    i: leg.tokenInIndex,
-    j: leg.tokenOutIndex,
-    dx: amountInRaw,
-    decimalsIn: leg.tokenInDecimals,
+    quoterAddress: config.okuQuoterV2Address,
+    tokenIn: leg.tokenInAddress,
+    tokenOut: leg.tokenOutAddress,
+    fee: leg.fee,
+    amountIn: amountInRaw,
   });
 }
 
-export async function simulatePath(
-  env: Env,
-  path: GeneratedPath,
-  initialAmount: number
-) {
+export async function simulatePath(env: Env, path: GeneratedPath, initialAmount: number) {
   try {
     if (!Array.isArray(path.legs) || path.legs.length < 2) {
       throw new Error("Path must contain at least 2 legs");
@@ -71,13 +63,12 @@ export async function simulatePath(
     let currentAmountRaw = toUnits(initialAmount, path.legs[0].tokenInDecimals);
     let currentAmountHuman = initialAmount;
 
-    for (let i = 0; i < path.legs.length; i++) {
-      const leg = path.legs[i];
-
+    for (const leg of path.legs) {
       const amountOutRaw = await simulateLeg(env, leg, currentAmountRaw);
       const amountOutHuman = fromUnits(amountOutRaw, leg.tokenOutDecimals);
 
       legResults.push({
+        venue: leg.venue,
         pool: leg.poolName,
         poolAddress: leg.poolAddress,
         fromSymbol: leg.tokenInSymbol,
@@ -91,7 +82,6 @@ export async function simulatePath(
     }
 
     const finalAmount = currentAmountHuman;
-    const pnlUsd = finalAmount - initialAmount;
 
     return {
       key: path.key,
@@ -99,8 +89,8 @@ export async function simulatePath(
       sharedTokenSymbol: path.sharedTokenSymbol,
       initialAmount,
       finalAmount,
-      pnlUsd,
-      pnlPct: initialAmount > 0 ? pnlUsd / initialAmount : 0,
+      pnlUsd: finalAmount - initialAmount,
+      pnlPct: initialAmount > 0 ? (finalAmount - initialAmount) / initialAmount : 0,
       legs: legResults,
     };
   } catch (error) {
@@ -110,6 +100,7 @@ export async function simulatePath(
       sharedTokenSymbol: path.sharedTokenSymbol,
       error: error instanceof Error ? error.message : String(error),
       legs: path.legs.map((leg) => ({
+        venue: leg.venue,
         pool: leg.poolName,
         poolAddress: leg.poolAddress,
         fromSymbol: leg.tokenInSymbol,

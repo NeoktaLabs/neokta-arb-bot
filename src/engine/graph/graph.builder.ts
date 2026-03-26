@@ -1,34 +1,29 @@
 // src/engine/graph/graph.builder.ts
 
-import type { DiscoveredCurvePool } from "../../integrations/curve/curve.types";
+import type { MarketPool } from "../../domain/markets";
 import type { GraphEdge, TokenGraph } from "./graph.types";
 
-export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
+export function buildTokenGraph(pools: MarketPool[]): TokenGraph {
   const edges: GraphEdge[] = [];
   const adjacency = new Map<string, GraphEdge[]>();
   const usdcAddresses = new Set<string>();
 
   for (const pool of pools) {
-    if (!pool.isTwoCoinPool) continue;
-    if (pool.coins.length !== 2) continue;
-
-    const [coinA, coinB] = pool.coins;
+    const [tokenA, tokenB] = pool.tokens;
 
     const edge: GraphEdge = {
+      venue: pool.venue,
       poolAddress: pool.address,
       poolName: pool.name ?? pool.address,
-
-      tokenAAddress: coinA.address,
-      tokenBAddress: coinB.address,
-
-      tokenASymbol: coinA.symbol,
-      tokenBSymbol: coinB.symbol,
-
-      indexA: coinA.index,
-      indexB: coinB.index,
-
-      decimalsA: coinA.decimals,
-      decimalsB: coinB.decimals,
+      tokenAAddress: tokenA.address,
+      tokenBAddress: tokenB.address,
+      tokenASymbol: tokenA.symbol,
+      tokenBSymbol: tokenB.symbol,
+      decimalsA: tokenA.decimals,
+      decimalsB: tokenB.decimals,
+      indexA: tokenA.index,
+      indexB: tokenB.index,
+      fee: pool.fee,
     };
 
     edges.push(edge);
@@ -42,8 +37,8 @@ export function buildTokenGraph(pools: DiscoveredCurvePool[]): TokenGraph {
     adjacency.get(aKey)!.push(edge);
     adjacency.get(bKey)!.push(edge);
 
-    if (pool.usdcCoinAddress) {
-      usdcAddresses.add(pool.usdcCoinAddress.toLowerCase());
+    if (pool.usdcTokenAddress) {
+      usdcAddresses.add(pool.usdcTokenAddress.toLowerCase());
     }
   }
 

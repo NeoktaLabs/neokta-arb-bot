@@ -3,37 +3,31 @@
 import type { Env } from "./domain/types";
 import { runScan } from "./services/scan.service";
 
-async function run(env: Env) {
-  const result = await runScan(env);
+async function handleRun(env: Env): Promise<Response> {
+  try {
+    const result = await runScan(env);
 
-  return Response.json({
-    ok: true,
-    result,
-  });
+    return Response.json({
+      ok: true,
+      result,
+    });
+  } catch (error) {
+    return Response.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export default {
-  async fetch(request: Request, env: Env) {
-    try {
-      const url = new URL(request.url);
-
-      if (url.pathname === "/health") {
-        return Response.json({ ok: true });
-      }
-
-      return await run(env);
-    } catch (error) {
-      return Response.json(
-        {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 }
-      );
-    }
+  async fetch(_request: Request, env: Env) {
+    return handleRun(env);
   },
 
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runScan(env));
+  async scheduled(_controller: unknown, env: Env, ctx: { waitUntil(promise: Promise<Response>): void }) {
+    ctx.waitUntil(handleRun(env));
   },
 };

@@ -5,6 +5,7 @@ import type { GeneratedPath, PathLeg } from "./path.types";
 
 function buildUsdcToTokenLeg(pool: ArbCandidate["pools"][number]): PathLeg {
   return {
+    venue: "curve",
     poolAddress: pool.address,
     poolName: pool.name ?? pool.address,
 
@@ -24,6 +25,7 @@ function buildUsdcToTokenLeg(pool: ArbCandidate["pools"][number]): PathLeg {
 
 function buildTokenToUsdcLeg(pool: ArbCandidate["pools"][number]): PathLeg {
   return {
+    venue: "curve",
     poolAddress: pool.address,
     poolName: pool.name ?? pool.address,
 

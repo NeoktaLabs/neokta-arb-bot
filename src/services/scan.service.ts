@@ -1,12 +1,8 @@
 // src/services/scan.service.ts
 
+import type { MarketPool } from "../domain/markets";
 import type { Env } from "../domain/types";
 import { getEnv } from "../config/env";
-import {
-  filterPositiveOpportunityEvaluations,
-  filterPositiveRouteResults,
-} from "../engine/filters/opportunity.filter";
-import { buildPoolHealthSummaries } from "../engine/filters/pool-quality.filter";
 import { classifySimulationResult } from "../engine/filters/result-quality.filter";
 import { buildTokenGraph } from "../engine/graph/graph.builder";
 import { monitorPoolImbalance } from "../engine/imbalance/imbalance.monitor";
@@ -15,26 +11,19 @@ import {
   buildInternalImbalanceCandidates,
 } from "../engine/opportunities/opportunity.builder";
 import { evaluateOpportunityPaths } from "../engine/opportunities/opportunity.evaluator";
-import { generateArbPaths } from "../engine/paths/arb-path.generator";
 import { generateMultiHopPaths } from "../engine/paths/multi-hop.generator";
 import { generatePaths } from "../engine/paths/path.generator";
 import { simulatePath } from "../engine/paths/path.simulator";
-import {
-  getDefaultSizeLadder,
-  simulatePathAcrossSizes,
-} from "../engine/sizing/size-ladder";
-import {
-  buildTokenClusters,
-  buildTrustedPools,
-  findArbCandidates,
-} from "../engine/universe/universe.builder";
+import { getDefaultSizeLadder, simulatePathAcrossSizes } from "../engine/sizing/size-ladder";
 import { discoverCurvePools } from "../integrations/curve/curve.discovery";
+import { discoverOkuPools } from "../integrations/oku/oku.discovery";
 import { logInfo } from "../lib/logger";
 import { buildAlertMessages } from "./alert-builder.service";
 import { sendTelegramAlerts } from "./alert.service";
 
 function summarizeLadder(ladder: any) {
   return {
+    key: ladder.key,
     type: ladder.type,
     bestOverall: ladder.bestOverall
       ? {
@@ -78,7 +67,49 @@ function isUnsupportedEvaluation(entry: any): boolean {
   return entry.curve.every((point: any) => point.health === "unsupported");
 }
 
-async function simulateAndClassifyPaths(env: Env, paths: any[]) {
+function toMarketPools(curvePools: Awaited<ReturnType<typeof discoverCurvePools>>, okuPools: Awaited<ReturnType<typeof discoverOkuPools>>): MarketPool[] {
+  const normalizedCurve: MarketPool[] = curvePools
+    .filter((pool) => pool.isTwoCoinPool && pool.coins.length === 2)
+    .map((pool) => ({
+      venue: "curve" as const,
+      address: pool.address,
+      name: pool.name,
+      tokens: [
+        {
+          address: pool.coins[0].address,
+          symbol: pool.coins[0].symbol,
+          decimals: pool.coins[0].decimals,
+          index: pool.coins[0].index,
+        },
+        {
+          address: pool.coins[1].address,
+          symbol: pool.coins[1].symbol,
+          decimals: pool.coins[1].decimals,
+          index: pool.coins[1].index,
+        },
+      ],
+      hasUsdc: pool.hasUsdc,
+      usdcTokenAddress: pool.usdcCoinAddress,
+    }));
+
+  const normalizedOku: MarketPool[] = okuPools.map((pool) => ({
+    venue: "oku" as const,
+    address: pool.address,
+    name: pool.name,
+    tokens: [pool.token0, pool.token1],
+    hasUsdc: pool.hasUsdc,
+    usdcTokenAddress: pool.usdcTokenAddress,
+    fee: pool.fee,
+    metadata: {
+      liquidity: pool.liquidity.toString(),
+      tick: pool.tick,
+    },
+  }));
+
+  return [...normalizedCurve, ...normalizedOku];
+}
+
+async function simulatePathSet(env: Env, paths: any[]) {
   const results = [];
 
   for (const path of paths) {
@@ -99,63 +130,41 @@ export async function runScan(env: Env) {
   const config = getEnv(env);
   const sizeLadder = getDefaultSizeLadder();
 
-  const discoveredPools = await discoverCurvePools(env);
+  const discoveredCurvePools = await discoverCurvePools(env);
+  const discoveredOkuPools = config.enableOku ? await discoverOkuPools(env) : [];
+  const marketPools = toMarketPools(discoveredCurvePools, discoveredOkuPools);
 
-  const twoCoinPools = discoveredPools.filter((pool) => pool.isTwoCoinPool);
-  const usdcPools = twoCoinPools.filter((pool) => pool.hasUsdc);
+  const routePools = marketPools.filter((pool) => pool.tokens.length === 2);
+  const usdcPools = routePools.filter((pool) => pool.hasUsdc);
 
   const baselinePaths = generatePaths(usdcPools);
-  const baselineRawResults = await simulateAndClassifyPaths(env, baselinePaths);
+  const baselineRawResults = await simulatePathSet(env, baselinePaths);
 
-  const healthyBaselineResults = baselineRawResults.filter(
-    (result: any) => result.health === "healthy"
-  );
-  const suspiciousBaselineResults = baselineRawResults.filter(
-    (result: any) => result.health === "suspicious"
-  );
-  const unsupportedBaselineResults = baselineRawResults.filter(
-    (result: any) => result.health === "unsupported"
-  );
+  const healthyBaselineResults = baselineRawResults.filter((result: any) => result.health === "healthy");
+  const suspiciousBaselineResults = baselineRawResults.filter((result: any) => result.health === "suspicious");
+  const unsupportedBaselineResults = baselineRawResults.filter((result: any) => result.health === "unsupported");
 
-  const poolHealth = buildPoolHealthSummaries(baselineRawResults);
+  const profitableBaselineResults = healthyBaselineResults
+    .filter((result: any) => typeof result.pnlUsd === "number")
+    .filter((result: any) => result.pnlUsd > config.minAlertProfitUsd)
+    .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
 
-  const trustedPools = buildTrustedPools(discoveredPools, poolHealth);
-  const tokenClusters = buildTokenClusters(trustedPools);
-  const arbCandidates = findArbCandidates(tokenClusters);
-
-  const arbPaths = generateArbPaths(arbCandidates);
-  const arbResults = await simulateAndClassifyPaths(env, arbPaths);
-
-  const healthyArbResults = arbResults.filter((result: any) => result.health === "healthy");
-  const suspiciousArbResults = arbResults.filter((result: any) => result.health === "suspicious");
-  const unsupportedArbResults = arbResults.filter((result: any) => result.health === "unsupported");
-
-  const profitableArbResults = filterPositiveRouteResults(healthyArbResults, config);
-
-  const graph = buildTokenGraph(discoveredPools);
+  const graph = buildTokenGraph(routePools);
   const multiHopPaths = generateMultiHopPaths(graph);
-  const multiHopResults = await simulateAndClassifyPaths(env, multiHopPaths);
+  const multiHopResults = await simulatePathSet(env, multiHopPaths);
 
-  const healthyMultiHopResults = multiHopResults.filter(
-    (result: any) => result.health === "healthy"
-  );
-  const suspiciousMultiHopResults = multiHopResults.filter(
-    (result: any) => result.health === "suspicious"
-  );
-  const unsupportedMultiHopResults = multiHopResults.filter(
-    (result: any) => result.health === "unsupported"
-  );
+  const healthyMultiHopResults = multiHopResults.filter((result: any) => result.health === "healthy");
+  const suspiciousMultiHopResults = multiHopResults.filter((result: any) => result.health === "suspicious");
+  const unsupportedMultiHopResults = multiHopResults.filter((result: any) => result.health === "unsupported");
 
-  const profitableMultiHopResults = filterPositiveRouteResults(healthyMultiHopResults, config);
+  const profitableMultiHopResults = healthyMultiHopResults
+    .filter((result: any) => typeof result.pnlUsd === "number")
+    .filter((result: any) => result.pnlUsd > config.minAlertProfitUsd)
+    .sort((a: any, b: any) => b.pnlUsd - a.pnlUsd);
 
   const baselineLadders = [];
   for (const path of baselinePaths) {
     baselineLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
-  }
-
-  const arbLadders = [];
-  for (const path of arbPaths) {
-    arbLadders.push(await simulatePathAcrossSizes(env, path, sizeLadder));
   }
 
   const multiHopLadders = [];
@@ -165,33 +174,15 @@ export async function runScan(env: Env) {
 
   const bestBaselineLadders = baselineLadders
     .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
-    .sort(
-      (a, b) =>
-        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
-        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
-    )
-    .map(summarizeLadder);
-
-  const bestArbLadders = arbLadders
-    .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
-    .sort(
-      (a, b) =>
-        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
-        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
-    )
+    .sort((a, b) => (b.bestOverall?.result?.pnlUsd ?? -Infinity) - (a.bestOverall?.result?.pnlUsd ?? -Infinity))
     .map(summarizeLadder);
 
   const bestMultiHopLadders = multiHopLadders
     .filter((entry) => entry.bestOverall?.result?.pnlUsd !== undefined)
-    .sort(
-      (a, b) =>
-        (b.bestOverall?.result?.pnlUsd ?? -Infinity) -
-        (a.bestOverall?.result?.pnlUsd ?? -Infinity)
-    )
+    .sort((a, b) => (b.bestOverall?.result?.pnlUsd ?? -Infinity) - (a.bestOverall?.result?.pnlUsd ?? -Infinity))
     .map(summarizeLadder);
 
-  const imbalanceTargets = discoveredPools.filter((pool) => pool.isTwoCoinPool);
-
+  const imbalanceTargets = discoveredCurvePools.filter((pool) => pool.isTwoCoinPool);
   const imbalanceReports = [];
   for (const pool of imbalanceTargets) {
     imbalanceReports.push(
@@ -203,15 +194,10 @@ export async function runScan(env: Env) {
     );
   }
 
-  const internalCandidates = buildInternalImbalanceCandidates(
-    imbalanceReports,
-    15,
-    discoveredPools
-  );
-
+  const internalCandidates = buildInternalImbalanceCandidates(imbalanceReports, 15, discoveredCurvePools);
   const internalExecutablePaths = buildExecutableInternalPaths({
     candidates: internalCandidates,
-    discoveredPools,
+    discoveredPools: discoveredCurvePools,
   });
 
   const rawInternalOpportunityEvaluations = await evaluateOpportunityPaths({
@@ -221,36 +207,22 @@ export async function runScan(env: Env) {
     sizeLadder,
   });
 
-  const supportedInternalEvaluations = rawInternalOpportunityEvaluations.filter(
-    (entry) => !isUnsupportedEvaluation(entry)
-  );
+  const supportedInternalEvaluations = rawInternalOpportunityEvaluations.filter((entry) => !isUnsupportedEvaluation(entry));
+  const unsupportedInternalEvaluations = rawInternalOpportunityEvaluations.filter((entry) => isUnsupportedEvaluation(entry));
 
-  const unsupportedInternalEvaluations = rawInternalOpportunityEvaluations.filter(
-    (entry) => isUnsupportedEvaluation(entry)
-  );
-
-  const profitableInternalOpportunities = filterPositiveOpportunityEvaluations(
-    supportedInternalEvaluations,
-    config
+  const profitableInternalOpportunities = supportedInternalEvaluations.filter(
+    (entry) =>
+      entry.bestHealthy &&
+      typeof entry.bestHealthy.pnlUsd === "number" &&
+      entry.bestHealthy.pnlUsd > config.minAlertProfitUsd
   );
 
   const output = {
-    totalConfiguredPools: discoveredPools.length,
-    totalTwoCoinPools: twoCoinPools.length,
-    totalUsdcTwoCoinPools: usdcPools.length,
-
-    config: {
-      initialUsdc: config.initialUsdc,
-      minAlertProfitUsd: config.minAlertProfitUsd,
-      minConfidentProfitUsd: config.minConfidentProfitUsd,
-      nearMissMinPnlUsd: config.nearMissMinPnlUsd,
+    totalConfiguredPools: routePools.length,
+    venues: {
+      curve: discoveredCurvePools.length,
+      oku: discoveredOkuPools.length,
     },
-
-    poolHealth,
-
-    trustedPools,
-    tokenClusters,
-    arbCandidates,
 
     baseline: {
       totalPaths: baselinePaths.length,
@@ -258,22 +230,11 @@ export async function runScan(env: Env) {
       healthyCount: healthyBaselineResults.length,
       suspiciousCount: suspiciousBaselineResults.length,
       unsupportedCount: unsupportedBaselineResults.length,
+      profitableCount: profitableBaselineResults.length,
+      profitable: profitableBaselineResults,
       healthyResults: healthyBaselineResults,
       suspiciousResults: suspiciousBaselineResults,
       unsupportedResults: unsupportedBaselineResults,
-    },
-
-    arbitrage: {
-      totalPaths: arbPaths.length,
-      totalSimulations: arbResults.length,
-      healthyCount: healthyArbResults.length,
-      suspiciousCount: suspiciousArbResults.length,
-      unsupportedCount: unsupportedArbResults.length,
-      profitableCount: profitableArbResults.length,
-      profitable: profitableArbResults,
-      healthyResults: healthyArbResults,
-      suspiciousResults: suspiciousArbResults,
-      unsupportedResults: unsupportedArbResults,
     },
 
     multiHop: {
@@ -292,7 +253,6 @@ export async function runScan(env: Env) {
     sizeLadder: {
       testedSizes: sizeLadder,
       baseline: bestBaselineLadders,
-      arbitrage: bestArbLadders,
       multiHop: bestMultiHopLadders,
     },
 
@@ -311,6 +271,14 @@ export async function runScan(env: Env) {
       supportedEvaluations: supportedInternalEvaluations,
       unsupportedEvaluations: unsupportedInternalEvaluations,
     },
+
+    config: {
+      initialUsdc: config.initialUsdc,
+      minAlertProfitUsd: config.minAlertProfitUsd,
+      minConfidentProfitUsd: config.minConfidentProfitUsd,
+      imbalanceAlertThresholdPct: config.imbalanceAlertThresholdPct,
+      okuEnabled: config.enableOku,
+    },
   };
 
   const alertMessages = buildAlertMessages(env, output);
@@ -318,20 +286,14 @@ export async function runScan(env: Env) {
 
   logInfo("Scan result", {
     totalConfiguredPools: output.totalConfiguredPools,
-    trustedPools: output.trustedPools.length,
-    arbCandidates: output.arbCandidates.length,
+    curvePools: output.venues.curve,
+    okuPools: output.venues.oku,
     baselinePaths: output.baseline.totalPaths,
-    arbPaths: output.arbitrage.totalPaths,
     multiHopPaths: output.multiHop.totalPaths,
-    profitableArb: output.arbitrage.profitableCount,
+    profitableBaseline: output.baseline.profitableCount,
     profitableMultiHop: output.multiHop.profitableCount,
-    imbalanceTargets: output.imbalanceMonitoring.totalTargets,
-    internalCandidates: output.internalOpportunities.totalCandidates,
-    internalExecutablePaths: output.internalOpportunities.totalExecutablePaths,
-    supportedInternal: output.internalOpportunities.supportedCount,
     profitableInternal: output.internalOpportunities.profitableCount,
     preparedAlerts: alertMessages.length,
-    minAlertProfitUsd: config.minAlertProfitUsd,
     telegramEnabled: alertDelivery.enabled,
     telegramSent: alertDelivery.sent,
   });

@@ -1,8 +1,10 @@
 // src/engine/graph/graph.types.ts
 
 import type { Address } from "../../domain/types";
+import type { VenueId } from "../../domain/markets";
 
 export interface GraphEdge {
+  venue: VenueId;
   poolAddress: Address;
   poolName: string;
 
@@ -12,11 +14,12 @@ export interface GraphEdge {
   tokenASymbol: string;
   tokenBSymbol: string;
 
-  indexA: number;
-  indexB: number;
-
   decimalsA: number;
   decimalsB: number;
+
+  indexA?: number;
+  indexB?: number;
+  fee?: number;
 }
 
 export interface TokenGraph {

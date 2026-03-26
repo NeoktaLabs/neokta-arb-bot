@@ -3,6 +3,8 @@
 import { DEFAULT_ETHERLINK_RPC_URL, normalizeAddress } from "../domain/constants";
 import type { Env } from "../domain/types";
 
+const DEFAULT_OKU_QUOTER_V2_ADDRESS = "0x8cb537fc92e26d8ebbb760e632c95484b6ea3e28";
+
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined) return defaultValue;
   return value.trim().toLowerCase() === "true";
@@ -18,8 +20,7 @@ export function getEnv(env: Env) {
     throw new Error("Missing required env var: USDC_ADDRESS");
   }
 
-  const minAlertProfitUsd = parseNumber(env.MIN_ALERT_PROFIT_USD, 0);
-  const minConfidentProfitUsd = parseNumber(
+  const confidentProfitUsd = parseNumber(
     env.MIN_CONFIDENT_PROFIT_USD ?? env.MIN_PROFIT_USD,
     0.25
   );
@@ -27,10 +28,15 @@ export function getEnv(env: Env) {
   return {
     rpcUrl: env.ETHERLINK_RPC_URL || DEFAULT_ETHERLINK_RPC_URL,
     initialUsdc: parseNumber(env.INITIAL_USDC, 1000),
-    minProfitUsd: minAlertProfitUsd,
-    minAlertProfitUsd,
-    minConfidentProfitUsd,
+    minProfitUsd: confidentProfitUsd,
+    minAlertProfitUsd: parseNumber(env.MIN_ALERT_PROFIT_USD, 0),
+    minConfidentProfitUsd: confidentProfitUsd,
     usdcAddress: normalizeAddress(env.USDC_ADDRESS),
+
+    enableOku: parseBoolean(env.ENABLE_OKU, true),
+    okuQuoterV2Address: normalizeAddress(
+      env.OKU_QUOTER_V2_ADDRESS || DEFAULT_OKU_QUOTER_V2_ADDRESS
+    ),
 
     enableTelegramAlerts: parseBoolean(env.ENABLE_TELEGRAM_ALERTS, false),
     enableNearMissAlerts: parseBoolean(env.ENABLE_NEAR_MISS_ALERTS, false),

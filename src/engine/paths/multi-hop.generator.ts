@@ -7,14 +7,16 @@ const MAX_DEPTH = 3;
 
 function buildLeg(
   edge: {
+    venue: "curve" | "oku";
     poolAddress: string;
     poolName: string;
     tokenAAddress: string;
     tokenBAddress: string;
     tokenASymbol: string;
     tokenBSymbol: string;
-    indexA: number;
-    indexB: number;
+    indexA?: number;
+    indexB?: number;
+    fee?: number;
     decimalsA: number;
     decimalsB: number;
   },
@@ -24,18 +26,16 @@ function buildLeg(
 
   return {
     leg: {
+      venue: edge.venue,
       poolAddress: edge.poolAddress as `0x${string}`,
       poolName: edge.poolName,
-
       tokenInAddress: (fromA ? edge.tokenAAddress : edge.tokenBAddress) as `0x${string}`,
       tokenOutAddress: (fromA ? edge.tokenBAddress : edge.tokenAAddress) as `0x${string}`,
-
       tokenInSymbol: fromA ? edge.tokenASymbol : edge.tokenBSymbol,
       tokenOutSymbol: fromA ? edge.tokenBSymbol : edge.tokenASymbol,
-
       tokenInIndex: fromA ? edge.indexA : edge.indexB,
       tokenOutIndex: fromA ? edge.indexB : edge.indexA,
-
+      fee: edge.fee,
       tokenInDecimals: fromA ? edge.decimalsA : edge.decimalsB,
       tokenOutDecimals: fromA ? edge.decimalsB : edge.decimalsA,
     },
@@ -59,13 +59,13 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
     const edges = graph.adjacency.get(currentTokenAddress.toLowerCase()) ?? [];
 
     for (const edge of edges) {
-      if (visitedPools.has(edge.poolAddress.toLowerCase())) continue;
+      const poolVisitKey = `${edge.venue}:${edge.poolAddress.toLowerCase()}`;
+      if (visitedPools.has(poolVisitKey)) continue;
 
       const { leg, nextTokenAddress } = buildLeg(edge, currentTokenAddress);
-
       const nextLegs = [...currentLegs, leg];
       const nextVisitedPools = new Set(visitedPools);
-      nextVisitedPools.add(edge.poolAddress.toLowerCase());
+      nextVisitedPools.add(poolVisitKey);
 
       if (
         nextTokenAddress.toLowerCase() === startTokenAddress.toLowerCase() &&
@@ -74,7 +74,7 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
         const key = [
           "multi",
           startTokenAddress.toLowerCase(),
-          ...nextLegs.map((item) => item.poolAddress.toLowerCase()),
+          ...nextLegs.map((item) => `${item.venue}:${item.poolAddress.toLowerCase()}`),
           ...nextLegs.map(
             (item) => `${item.tokenInAddress.toLowerCase()}->${item.tokenOutAddress.toLowerCase()}`
           ),
@@ -87,7 +87,7 @@ export function generateMultiHopPaths(graph: TokenGraph): GeneratedPath[] {
             key,
             type: "multi-hop-roundtrip",
             sharedTokenAddress: nextLegs[0].tokenOutAddress,
-            sharedTokenSymbol: "MULTI",
+            sharedTokenSymbol: nextLegs.map((item) => item.tokenOutSymbol).join(" → "),
             legs: nextLegs,
           });
         }
