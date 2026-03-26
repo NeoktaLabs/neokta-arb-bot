@@ -34,6 +34,13 @@ export interface Env {
   TELEGRAM_CHAT_ID?: string;
 
   LADDER_SIZES?: string;
+
+  RPC_MAX_CONCURRENCY?: string;
+  RPC_MIN_INTERVAL_MS?: string;
+  RPC_MAX_RETRIES?: string;
+  RPC_BASE_BACKOFF_MS?: string;
+  RPC_MAX_BACKOFF_MS?: string;
+  RPC_JITTER_MS?: string;
 }
 
 export type TokenSymbol = string;

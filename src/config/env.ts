@@ -23,6 +23,10 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseInteger(value: string | undefined, fallback: number): number {
+  return Math.max(0, Math.floor(parseNumber(value, fallback)));
+}
+
 function parseNumberArray(value: string | undefined, fallback: number[]): number[] {
   if (!value || value.trim() === "") return fallback;
   const parsed = value
@@ -37,6 +41,10 @@ function requireAddress(name: string, value: string | undefined) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return normalizeAddress(value);
+}
+
+function getDefaultRpcMaxConcurrency(chainId: ChainId): number {
+  return chainId === "ethereum" ? 3 : 2;
 }
 
 export function getEnabledChains(env: Env): ChainId[] {
@@ -66,10 +74,19 @@ export function getEnv(env: Env, chainId: ChainId = "etherlink"): AppConfig {
     enableImbalanceAlerts: parseBoolean(env.ENABLE_IMBALANCE_ALERTS, true),
     nearMissMinPnlUsd: parseNumber(env.NEAR_MISS_MIN_PNL_USD, -1),
     imbalanceAlertThresholdPct: parseNumber(env.IMBALANCE_ALERT_THRESHOLD_PCT, 20),
-    maxAlertsPerScan: Math.max(1, Math.floor(parseNumber(env.MAX_ALERTS_PER_SCAN, 5))),
+    maxAlertsPerScan: Math.max(1, parseInteger(env.MAX_ALERTS_PER_SCAN, 5)),
     telegramBotToken: env.TELEGRAM_BOT_TOKEN?.trim() || "",
     telegramChatId: env.TELEGRAM_CHAT_ID?.trim() || "",
     ladderSizes: parseNumberArray(env.LADDER_SIZES, [100, 1000]),
+    rpcMaxConcurrency: Math.max(
+      1,
+      parseInteger(env.RPC_MAX_CONCURRENCY, getDefaultRpcMaxConcurrency(chainId))
+    ),
+    rpcMinIntervalMs: parseInteger(env.RPC_MIN_INTERVAL_MS, 75),
+    rpcMaxRetries: parseInteger(env.RPC_MAX_RETRIES, 3),
+    rpcBaseBackoffMs: parseInteger(env.RPC_BASE_BACKOFF_MS, 300),
+    rpcMaxBackoffMs: parseInteger(env.RPC_MAX_BACKOFF_MS, 2000),
+    rpcJitterMs: parseInteger(env.RPC_JITTER_MS, 150),
   };
 
   if (chainId === "ethereum") {
@@ -82,10 +99,14 @@ export function getEnv(env: Env, chainId: ChainId = "etherlink"): AppConfig {
       okuQuoterV2Address: ("0x0000000000000000000000000000000000000000" as `0x${string}`),
       enableUniswap,
       uniswapFactoryAddress: enableUniswap
-        ? normalizeAddress(env.ETHEREUM_UNISWAP_FACTORY_ADDRESS || DEFAULT_ETHEREUM_UNISWAP_FACTORY_ADDRESS)
+        ? normalizeAddress(
+            env.ETHEREUM_UNISWAP_FACTORY_ADDRESS || DEFAULT_ETHEREUM_UNISWAP_FACTORY_ADDRESS
+          )
         : ("0x0000000000000000000000000000000000000000" as `0x${string}`),
       uniswapQuoterV2Address: enableUniswap
-        ? normalizeAddress(env.ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS || DEFAULT_ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS)
+        ? normalizeAddress(
+            env.ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS || DEFAULT_ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS
+          )
         : ("0x0000000000000000000000000000000000000000" as `0x${string}`),
     };
   }

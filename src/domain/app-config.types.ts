@@ -31,4 +31,11 @@ export interface AppConfig {
   telegramChatId: string;
 
   ladderSizes: number[];
+
+  rpcMaxConcurrency: number;
+  rpcMinIntervalMs: number;
+  rpcMaxRetries: number;
+  rpcBaseBackoffMs: number;
+  rpcMaxBackoffMs: number;
+  rpcJitterMs: number;
 }
