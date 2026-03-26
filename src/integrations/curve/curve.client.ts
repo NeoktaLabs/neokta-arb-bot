@@ -1,10 +1,11 @@
 // src/integrations/curve/curve.client.ts
 
-import { getClient } from "../etherlink/rpc.client";
-import type { Env } from "../../domain/types";
-import type { CurvePoolCoin, CurvePoolSnapshot } from "./curve.types";
+import type { ChainId } from "../../domain/chain.types";
+import type { Env, Address } from "../../domain/types";
+import { getClient } from "../rpc/rpc.client";
+import type { CurvePoolSnapshot, CurveTokenMetadata } from "./curve.types";
 
-const POOL_COINS_ABI = [
+const CURVE_POOL_ABI = [
   {
     name: "coins",
     type: "function",
@@ -19,9 +20,6 @@ const POOL_COINS_ABI = [
     inputs: [{ name: "i", type: "uint256" }],
     outputs: [{ type: "uint256" }],
   },
-] as const;
-
-const GET_DY_INT128_ABI = [
   {
     name: "get_dy",
     type: "function",
@@ -33,9 +31,6 @@ const GET_DY_INT128_ABI = [
     ],
     outputs: [{ type: "uint256" }],
   },
-] as const;
-
-const GET_DY_UINT256_ABI = [
   {
     name: "get_dy",
     type: "function",
@@ -68,20 +63,21 @@ const ERC20_ABI = [
 
 async function readCoinAddress(
   env: Env,
-  poolAddress: string,
+  chainId: ChainId,
+  poolAddress: Address,
   index: number
-): Promise<`0x${string}` | null> {
+): Promise<Address | null> {
   const client = getClient(env, chainId);
 
   try {
     const address = await client.readContract({
-      address: poolAddress as `0x${string}`,
-      abi: POOL_COINS_ABI,
+      address: poolAddress,
+      abi: CURVE_POOL_ABI,
       functionName: "coins",
       args: [BigInt(index)],
     });
 
-    return address;
+    return address as Address;
   } catch {
     return null;
   }
@@ -89,126 +85,120 @@ async function readCoinAddress(
 
 async function readBalance(
   env: Env,
-  poolAddress: string,
-  index: number,
-  decimals: number
-): Promise<number> {
-  const client = getClient(env, chainId);
-
-  const rawBalance = await client.readContract({
-    address: poolAddress as `0x${string}`,
-    abi: POOL_COINS_ABI,
-    functionName: "balances",
-    args: [BigInt(index)],
-  });
-
-  return Number(rawBalance) / 10 ** decimals;
-}
-
-async function readCoinMetadata(
-  env: Env,
-  coinAddress: `0x${string}`,
+  chainId: ChainId,
+  poolAddress: Address,
   index: number
-): Promise<CurvePoolCoin | null> {
+): Promise<bigint | null> {
   const client = getClient(env, chainId);
 
   try {
-    const [symbol, decimals] = await Promise.all([
-      client.readContract({
-        address: coinAddress,
-        abi: ERC20_ABI,
-        functionName: "symbol",
-      }),
-      client.readContract({
-        address: coinAddress,
-        abi: ERC20_ABI,
-        functionName: "decimals",
-      }),
-    ]);
+    const balance = await client.readContract({
+      address: poolAddress,
+      abi: CURVE_POOL_ABI,
+      functionName: "balances",
+      args: [BigInt(index)],
+    });
 
-    return {
-      index,
-      address: coinAddress,
-      symbol,
-      decimals: Number(decimals),
-    };
+    return balance as bigint;
   } catch {
     return null;
   }
 }
 
-export async function getCurvePoolSnapshot(
+async function readCoinMetadata(
   env: Env,
-  chainId: import("../../domain/chains").ChainId,
-  poolAddress: string
-): Promise<CurvePoolSnapshot> {
-  const coin0Address = await readCoinAddress(env, chainId, poolAddress, 0);
-  const coin1Address = await readCoinAddress(env, chainId, poolAddress, 1);
+  chainId: ChainId,
+  tokenAddress: Address
+): Promise<CurveTokenMetadata> {
+  const client = getClient(env, chainId);
 
-  if (!coin0Address || !coin1Address) {
-    throw new Error("Pool does not expose 2 readable coin slots");
-  }
-
-  const [coin0, coin1] = await Promise.all([
-    readCoinMetadata(env, chainId, coin0Address, 0),
-    readCoinMetadata(env, chainId, coin1Address, 1),
-  ]);
-
-  if (!coin0 || !coin1) {
-    throw new Error("Failed to read coin metadata");
-  }
-
-  const balances = await Promise.all([
-    readBalance(env, chainId, poolAddress, coin0.index, coin0.decimals),
-    readBalance(env, chainId, poolAddress, coin1.index, coin1.decimals),
+  const [symbol, decimals] = await Promise.all([
+    client.readContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "symbol",
+    }),
+    client.readContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "decimals",
+    }),
   ]);
 
   return {
-    poolAddress: poolAddress as `0x${string}`,
-    coins: [coin0, coin1],
-    balances,
+    address: tokenAddress,
+    symbol: String(symbol),
+    decimals: Number(decimals),
   };
 }
 
-export async function hasThirdCoin(
+export async function getCurvePoolSnapshot(
   env: Env,
-  chainId: import("../../domain/chains").ChainId,
-  poolAddress: string
-): Promise<boolean> {
-  const coin2 = await readCoinAddress(env, chainId, poolAddress, 2);
-  return coin2 !== null;
+  chainId: ChainId,
+  poolAddress: Address
+): Promise<CurvePoolSnapshot> {
+  const [coin0, coin1, coin2, balance0, balance1, balance2] = await Promise.all([
+    readCoinAddress(env, chainId, poolAddress, 0),
+    readCoinAddress(env, chainId, poolAddress, 1),
+    readCoinAddress(env, chainId, poolAddress, 2),
+    readBalance(env, chainId, poolAddress, 0),
+    readBalance(env, chainId, poolAddress, 1),
+    readBalance(env, chainId, poolAddress, 2),
+  ]);
+
+  if (!coin0 || !coin1 || balance0 === null || balance1 === null) {
+    throw new Error(`Curve pool ${poolAddress} missing required coins/balances`);
+  }
+
+  const [token0, token1, token2] = await Promise.all([
+    readCoinMetadata(env, chainId, coin0),
+    readCoinMetadata(env, chainId, coin1),
+    coin2 ? readCoinMetadata(env, chainId, coin2) : Promise.resolve(null),
+  ]);
+
+  return {
+    poolAddress,
+    tokens: token2 ? [token0, token1, token2] : [token0, token1],
+    rawBalances: balance2 === null ? [balance0, balance1] : [balance0, balance1, balance2],
+  };
 }
 
 export async function getCurveDyInt128(
   env: Env,
-  poolAddress: string,
+  chainId: ChainId,
+  poolAddress: Address,
   i: number,
   j: number,
   dx: bigint
 ): Promise<bigint> {
   const client = getClient(env, chainId);
 
-  return client.readContract({
-    address: poolAddress as `0x${string}`,
-    abi: GET_DY_INT128_ABI,
+  const result = await client.readContract({
+    address: poolAddress,
+    abi: CURVE_POOL_ABI,
     functionName: "get_dy",
     args: [BigInt(i), BigInt(j), dx],
-  }) as Promise<bigint>;
+  });
+
+  return result as bigint;
 }
 
 export async function getCurveDyUint256(
   env: Env,
-  poolAddress: string,
+  chainId: ChainId,
+  poolAddress: Address,
   i: number,
   j: number,
   dx: bigint
 ): Promise<bigint> {
   const client = getClient(env, chainId);
 
-  return client.readContract({
-    address: poolAddress as `0x${string}`,
-    abi: GET_DY_UINT256_ABI,
+  const result = await client.readContract({
+    address: poolAddress,
+    abi: CURVE_POOL_ABI,
     functionName: "get_dy",
     args: [BigInt(i), BigInt(j), dx],
-  }) as Promise<bigint>;
+  });
+
+  return result as bigint;
 }
