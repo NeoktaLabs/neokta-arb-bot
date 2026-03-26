@@ -24,6 +24,9 @@
 
     "OKU_QUOTER_V2_ADDRESS": "0xaa52bB8110fE38D0d2d2AF0B85C3A3eE622CA455",
 
+    // 🔥 NEW: ladder sizes (reduces RPC load significantly)
+    "LADDER_SIZES": "100,1000",
+
     // Alert on any positive full-route PnL
     "MIN_ALERT_PROFIT_USD": "0",
 
@@ -45,6 +48,5 @@
     "MAX_ALERTS_PER_SCAN": "10",
 
     "LOG_LEVEL": "info"
-
   }
 }
