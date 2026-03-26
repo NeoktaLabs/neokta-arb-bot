@@ -102,4 +102,18 @@ export const ETHEREUM_UNISWAP_POOLS: UniswapPoolSeed[] = [
     token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     fee: 500,
   },
+
+  // Meme coins
+  {
+    name: "Uniswap PEPE/WETH 0.3%",
+    token0: "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+    token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    fee: 3000,
+  },
+  {
+    name: "Uniswap SHIB/WETH 0.3%",
+    token0: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
+    token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    fee: 3000,
+  },
 ];
