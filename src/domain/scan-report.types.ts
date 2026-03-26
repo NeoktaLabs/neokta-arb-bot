@@ -1,5 +1,6 @@
 // src/domain/scan-report.types.ts
 
+import type { ChainId } from "./chains";
 import type { MarketPool } from "./markets";
 import type { PathSimulationResult } from "../engine/simulation/simulation.types";
 import type { PathLadderSummary } from "../engine/sizing/size-ladder";
@@ -9,12 +10,14 @@ import type { OpportunityEvaluation } from "../engine/opportunities/opportunity.
 export interface DiscoveryWorkflowReport {
   curvePools: unknown[];
   okuPools: unknown[];
+  uniswapPools: unknown[];
   marketPools: MarketPool[];
   routePools: MarketPool[];
   usdcPools: MarketPool[];
   summary: {
     curve: number;
     oku: number;
+    uniswap: number;
     total: number;
     usdcAnchored: number;
   };
@@ -105,6 +108,7 @@ export interface AlertPlanReport {
 
 export interface ScanReport {
   scanId: string;
+  chainId: ChainId;
   startedAt: string;
   completedAt: string;
   durationMs: number;
@@ -112,6 +116,7 @@ export interface ScanReport {
   venues: {
     curve: number;
     oku: number;
+    uniswap: number;
   };
   discovery: DiscoveryWorkflowReport["summary"];
   baseline: SimulationWorkflowReport;
@@ -129,6 +134,7 @@ export interface ScanReport {
     minConfidentProfitUsd: number;
     imbalanceAlertThresholdPct: number;
     okuEnabled: boolean;
+    uniswapEnabled: boolean;
     alertMode: "profit_only";
   };
   alerts: AlertPlanReport;

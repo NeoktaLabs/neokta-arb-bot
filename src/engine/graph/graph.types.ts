@@ -1,22 +1,20 @@
 // src/engine/graph/graph.types.ts
 
+import type { ChainId } from "../../domain/chains";
 import type { Address } from "../../domain/types";
 import type { VenueId } from "../../domain/markets";
 
 export interface GraphEdge {
+  chainId: ChainId;
   venue: VenueId;
   poolAddress: Address;
   poolName: string;
-
   tokenAAddress: Address;
   tokenBAddress: Address;
-
   tokenASymbol: string;
   tokenBSymbol: string;
-
   decimalsA: number;
   decimalsB: number;
-
   indexA?: number;
   indexB?: number;
   fee?: number;

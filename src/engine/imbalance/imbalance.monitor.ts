@@ -45,6 +45,7 @@ async function quoteDirection(args: {
 
       const amountOutRaw = await quoteCurveSwap({
         env: args.env,
+        chainId: args.pool.chainId,
         poolAddress: args.pool.address,
         i: args.fromIndex,
         j: args.toIndex,

@@ -10,11 +10,11 @@ export function buildTokenGraph(pools: MarketPool[]): TokenGraph {
 
   for (const pool of pools) {
     const [tokenA, tokenB] = pool.tokens;
-
     const edge: GraphEdge = {
+      chainId: pool.chainId,
       venue: pool.venue,
       poolAddress: pool.address,
-      poolName: pool.name ?? pool.address,
+      poolName: pool.name,
       tokenAAddress: tokenA.address,
       tokenBAddress: tokenB.address,
       tokenASymbol: tokenA.symbol,
@@ -25,26 +25,15 @@ export function buildTokenGraph(pools: MarketPool[]): TokenGraph {
       indexB: tokenB.index,
       fee: pool.fee,
     };
-
     edges.push(edge);
-
     const aKey = edge.tokenAAddress.toLowerCase();
     const bKey = edge.tokenBAddress.toLowerCase();
-
     if (!adjacency.has(aKey)) adjacency.set(aKey, []);
     if (!adjacency.has(bKey)) adjacency.set(bKey, []);
-
     adjacency.get(aKey)!.push(edge);
     adjacency.get(bKey)!.push(edge);
-
-    if (pool.usdcTokenAddress) {
-      usdcAddresses.add(pool.usdcTokenAddress.toLowerCase());
-    }
+    if (pool.usdcTokenAddress) usdcAddresses.add(pool.usdcTokenAddress.toLowerCase());
   }
 
-  return {
-    edges,
-    adjacency,
-    usdcAddresses: Array.from(usdcAddresses) as `0x${string}`[],
-  };
+  return { edges, adjacency, usdcAddresses: Array.from(usdcAddresses) as `0x${string}`[] };
 }

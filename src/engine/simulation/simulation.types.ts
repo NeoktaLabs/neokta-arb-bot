@@ -1,9 +1,11 @@
 // src/engine/simulation/simulation.types.ts
 
-import type { GeneratedPath } from "../paths/path.types";
+import type { ChainId } from "../../domain/chains";
 import type { VenueId } from "../../domain/markets";
+import type { GeneratedPath } from "../paths/path.types";
 
 export interface SimulationStepResult {
+  chainId: ChainId;
   venue: VenueId;
   poolName: string;
   poolAddress: `0x${string}`;

@@ -1,17 +1,26 @@
 // src/domain/types.ts
 
+import type { ChainId } from "./chains";
+
 export type Address = `0x${string}`;
 
 export interface Env {
   ETHERLINK_RPC_URL?: string;
+  ETHEREUM_RPC_URL?: string;
+  ENABLE_ETHEREUM?: string;
   INITIAL_USDC?: string;
   MIN_PROFIT_USD?: string;
   MIN_ALERT_PROFIT_USD?: string;
   MIN_CONFIDENT_PROFIT_USD?: string;
   USDC_ADDRESS?: string;
+  ETHEREUM_USDC_ADDRESS?: string;
 
   ENABLE_OKU?: string;
   OKU_QUOTER_V2_ADDRESS?: string;
+
+  ENABLE_UNISWAP?: string;
+  ETHEREUM_UNISWAP_FACTORY_ADDRESS?: string;
+  ETHEREUM_UNISWAP_QUOTER_V2_ADDRESS?: string;
 
   ENABLE_TELEGRAM_ALERTS?: string;
   ENABLE_NEAR_MISS_ALERTS?: string;
@@ -58,4 +67,8 @@ export interface PathResult {
   pnlUsd: number;
   pnlPct: number;
   steps: SwapStep[];
+}
+
+export interface ChainSelection {
+  chainId: ChainId;
 }

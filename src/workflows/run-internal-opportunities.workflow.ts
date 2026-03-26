@@ -27,6 +27,9 @@ export async function runInternalOpportunitiesWorkflow(
   imbalance: ImbalanceWorkflowReport,
   sizeLadder: number[]
 ): Promise<InternalOpportunityWorkflowReport> {
+  if (context.chainId !== "etherlink" || !discovery.curvePools.length) {
+    return { totalCandidates: 0, totalExecutablePaths: 0, supportedCount: 0, unsupportedCount: 0, profitableCount: 0, profitable: [], supportedEvaluations: [], unsupportedEvaluations: [] };
+  }
   const candidates = buildInternalImbalanceCandidates(
     imbalance.reports as any[],
     15,

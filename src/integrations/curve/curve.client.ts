@@ -71,7 +71,7 @@ async function readCoinAddress(
   poolAddress: string,
   index: number
 ): Promise<`0x${string}` | null> {
-  const client = getClient(env);
+  const client = getClient(env, chainId);
 
   try {
     const address = await client.readContract({
@@ -93,7 +93,7 @@ async function readBalance(
   index: number,
   decimals: number
 ): Promise<number> {
-  const client = getClient(env);
+  const client = getClient(env, chainId);
 
   const rawBalance = await client.readContract({
     address: poolAddress as `0x${string}`,
@@ -110,7 +110,7 @@ async function readCoinMetadata(
   coinAddress: `0x${string}`,
   index: number
 ): Promise<CurvePoolCoin | null> {
-  const client = getClient(env);
+  const client = getClient(env, chainId);
 
   try {
     const [symbol, decimals] = await Promise.all([
@@ -139,18 +139,19 @@ async function readCoinMetadata(
 
 export async function getCurvePoolSnapshot(
   env: Env,
+  chainId: import("../../domain/chains").ChainId,
   poolAddress: string
 ): Promise<CurvePoolSnapshot> {
-  const coin0Address = await readCoinAddress(env, poolAddress, 0);
-  const coin1Address = await readCoinAddress(env, poolAddress, 1);
+  const coin0Address = await readCoinAddress(env, chainId, poolAddress, 0);
+  const coin1Address = await readCoinAddress(env, chainId, poolAddress, 1);
 
   if (!coin0Address || !coin1Address) {
     throw new Error("Pool does not expose 2 readable coin slots");
   }
 
   const [coin0, coin1] = await Promise.all([
-    readCoinMetadata(env, coin0Address, 0),
-    readCoinMetadata(env, coin1Address, 1),
+    readCoinMetadata(env, chainId, coin0Address, 0),
+    readCoinMetadata(env, chainId, coin1Address, 1),
   ]);
 
   if (!coin0 || !coin1) {
@@ -158,8 +159,8 @@ export async function getCurvePoolSnapshot(
   }
 
   const balances = await Promise.all([
-    readBalance(env, poolAddress, coin0.index, coin0.decimals),
-    readBalance(env, poolAddress, coin1.index, coin1.decimals),
+    readBalance(env, chainId, poolAddress, coin0.index, coin0.decimals),
+    readBalance(env, chainId, poolAddress, coin1.index, coin1.decimals),
   ]);
 
   return {
@@ -171,9 +172,10 @@ export async function getCurvePoolSnapshot(
 
 export async function hasThirdCoin(
   env: Env,
+  chainId: import("../../domain/chains").ChainId,
   poolAddress: string
 ): Promise<boolean> {
-  const coin2 = await readCoinAddress(env, poolAddress, 2);
+  const coin2 = await readCoinAddress(env, chainId, poolAddress, 2);
   return coin2 !== null;
 }
 
@@ -184,7 +186,7 @@ export async function getCurveDyInt128(
   j: number,
   dx: bigint
 ): Promise<bigint> {
-  const client = getClient(env);
+  const client = getClient(env, chainId);
 
   return client.readContract({
     address: poolAddress as `0x${string}`,
@@ -201,7 +203,7 @@ export async function getCurveDyUint256(
   j: number,
   dx: bigint
 ): Promise<bigint> {
-  const client = getClient(env);
+  const client = getClient(env, chainId);
 
   return client.readContract({
     address: poolAddress as `0x${string}`,

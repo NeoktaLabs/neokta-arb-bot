@@ -28,6 +28,13 @@ function formatRoute(entry: { legs?: Array<{ fromSymbol?: string; toSymbol?: str
   return parts.join(" → ");
 }
 
+
+function formatChain(entry: { chainId?: string; legs?: Array<{ chainId?: string }> }): string {
+  if (entry.chainId) return String(entry.chainId).toUpperCase();
+  const legChain = Array.isArray(entry.legs) && entry.legs.length > 0 ? entry.legs[0]?.chainId : undefined;
+  return legChain ? String(legChain).toUpperCase() : "UNKNOWN";
+}
+
 function formatVenues(entry: { legs?: Array<{ venue?: string }> }): string {
   const legs = Array.isArray(entry.legs) ? entry.legs : [];
   const venues = Array.from(new Set(legs.map((leg) => String(leg?.venue ?? "unknown"))));
@@ -61,7 +68,7 @@ export function buildAlertMessages(env: Env, scanResult: any): TelegramAlertMess
 
     messages.push({
       category: "profit",
-      title: "🟢 Profitable internal path",
+      title: `🟢 [${scanResult?.chainId ? String(scanResult.chainId).toUpperCase() : "UNKNOWN"}] Profitable internal path`,
       score: best.pnlUsd,
       body: [
         `Pool: ${candidate?.poolName ?? candidate?.poolAddress ?? "unknown"}`,
@@ -80,7 +87,7 @@ export function buildAlertMessages(env: Env, scanResult: any): TelegramAlertMess
 
     messages.push({
       category: "profit",
-      title: "🟢 Profitable cycle",
+      title: `🟢 [${formatChain(entry)}] Profitable cycle`,
       score: entry.pnlUsd,
       body: [
         `Route: ${formatRoute(entry)}`,
@@ -101,7 +108,7 @@ export function buildAlertMessages(env: Env, scanResult: any): TelegramAlertMess
 
     messages.push({
       category: "profit",
-      title: "🟢 Profitable multi-hop cycle",
+      title: `🟢 [${formatChain(entry)}] Profitable multi-hop cycle`,
       score: entry.pnlUsd,
       body: [
         `Route: ${formatRoute(entry)}`,

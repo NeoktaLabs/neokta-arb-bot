@@ -1,19 +1,23 @@
 // src/integrations/etherlink/rpc.client.ts
 
 import { createPublicClient, http } from "viem";
-import type { Env } from "../../domain/types";
 import { getEnv } from "../../config/env";
+import type { ChainId } from "../../domain/chains";
+import type { Env } from "../../domain/types";
 
-let client: ReturnType<typeof createPublicClient> | null = null;
+const clients = new Map<string, ReturnType<typeof createPublicClient>>();
 
-export function getClient(env: Env) {
-  if (client) return client;
+export function getClient(env: Env, chainId: ChainId = "etherlink") {
+  const { rpcUrl } = getEnv(env, chainId);
+  const cacheKey = `${chainId}:${rpcUrl}`;
 
-  const { rpcUrl } = getEnv(env);
+  const existing = clients.get(cacheKey);
+  if (existing) return existing;
 
-  client = createPublicClient({
+  const client = createPublicClient({
     transport: http(rpcUrl),
   });
 
+  clients.set(cacheKey, client);
   return client;
 }

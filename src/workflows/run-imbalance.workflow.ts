@@ -9,6 +9,9 @@ export async function runImbalanceWorkflow(
   context: ScanContext,
   discovery: DiscoveryWorkflowReport
 ): Promise<ImbalanceWorkflowReport> {
+  if (context.chainId !== "etherlink" || !discovery.curvePools.length) {
+    return { totalTargets: 0, reports: [] };
+  }
   const imbalanceTargets = discovery.curvePools.filter((pool: any) => pool.isTwoCoinPool);
   const reports = [];
 

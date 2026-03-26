@@ -1,8 +1,9 @@
 // src/domain/markets.ts
 
+import type { ChainId } from "./chains";
 import type { Address } from "./types";
 
-export type VenueId = "curve" | "oku";
+export type VenueId = "curve" | "oku" | "uniswap";
 
 export interface MarketToken {
   address: Address;
@@ -12,6 +13,7 @@ export interface MarketToken {
 }
 
 export interface MarketPool {
+  chainId: ChainId;
   venue: VenueId;
   address: Address;
   name: string;
