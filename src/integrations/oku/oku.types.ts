@@ -15,6 +15,7 @@ export interface OkuPoolToken {
 
 export interface OkuPoolSnapshot {
   poolAddress: Address;
+  factory: Address;
   token0: OkuPoolToken;
   token1: OkuPoolToken;
   fee: number;
@@ -26,6 +27,7 @@ export interface OkuPoolSnapshot {
 export interface DiscoveredOkuPool {
   name: string;
   address: Address;
+  factory: Address;
   token0: OkuPoolToken;
   token1: OkuPoolToken;
   fee: number;
