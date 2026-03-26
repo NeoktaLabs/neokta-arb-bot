@@ -49,7 +49,7 @@
     // =========================
 
     // 🔥 Ladder (optimized)
-    "LADDER_SIZES": "100,1000",
+    "LADDER_SIZES": "1000",
 
     // Profit thresholds
     "MIN_ALERT_PROFIT_USD": "0",
