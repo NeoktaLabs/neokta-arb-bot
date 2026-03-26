@@ -6,6 +6,13 @@ import type { OkuPoolSnapshot, OkuPoolToken } from "./oku.types";
 
 const OKU_POOL_ABI = [
   {
+    name: "factory",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
     name: "token0",
     type: "function",
     stateMutability: "view",
@@ -89,13 +96,31 @@ async function readTokenMetadata(env: Env, address: `0x${string}`): Promise<OkuP
   };
 }
 
+export async function readOkuPoolFactory(
+  env: Env,
+  poolAddress: `0x${string}`
+): Promise<`0x${string}`> {
+  const client = getClient(env);
+
+  return client.readContract({
+    address: poolAddress,
+    abi: OKU_POOL_ABI,
+    functionName: "factory",
+  });
+}
+
 export async function getOkuPoolSnapshot(
   env: Env,
   poolAddress: `0x${string}`
 ): Promise<OkuPoolSnapshot> {
   const client = getClient(env);
 
-  const [token0Address, token1Address, fee, liquidity, slot0] = await Promise.all([
+  const [factory, token0Address, token1Address, fee, liquidity, slot0] = await Promise.all([
+    client.readContract({
+      address: poolAddress,
+      abi: OKU_POOL_ABI,
+      functionName: "factory",
+    }),
     client.readContract({
       address: poolAddress,
       abi: OKU_POOL_ABI,
@@ -130,6 +155,7 @@ export async function getOkuPoolSnapshot(
 
   return {
     poolAddress,
+    factory,
     token0,
     token1,
     fee: Number(fee),
