@@ -29,6 +29,7 @@ export async function discoverOkuPools(env: Env): Promise<DiscoveredOkuPool[]> {
       const discovered: DiscoveredOkuPool = {
         name,
         address: normalizeAddress(snapshot.poolAddress),
+        factory: normalizeAddress(snapshot.factory),
         token0: snapshot.token0,
         token1: snapshot.token1,
         fee: snapshot.fee,
@@ -44,6 +45,7 @@ export async function discoverOkuPools(env: Env): Promise<DiscoveredOkuPool[]> {
       logInfo("Discovered Oku pool", {
         pool: discovered.name,
         address: discovered.address,
+        factory: discovered.factory,
         token0: discovered.token0,
         token1: discovered.token1,
         fee: discovered.fee,
