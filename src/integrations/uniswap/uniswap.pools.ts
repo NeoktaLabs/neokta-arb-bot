@@ -91,10 +91,22 @@ export const ETHEREUM_UNISWAP_POOLS: UniswapPoolSeed[] = [
     fee: 100,
   },
   {
+    name: "Uniswap wstETH/USDC 0.3%",
+    token0: "0x7f39c581f595b53c5cb5bbd66c9352e07dc9e6ae",
+    token1: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    fee: 3000,
+  },
+  {
     name: "Uniswap cbETH/WETH 0.05%",
     token0: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704",
     token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     fee: 500,
+  },
+  {
+    name: "Uniswap cbETH/USDC 0.3%",
+    token0: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704",
+    token1: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    fee: 3000,
   },
   {
     name: "Uniswap rETH/WETH 0.05%",
