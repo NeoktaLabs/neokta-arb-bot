@@ -23,7 +23,7 @@
     "INITIAL_USDC": "1000",
 
     // =========================
-    // ETHEREUMLINK (CURRENT)
+    // ETHERLINK (CURRENT)
     // =========================
 
     "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com",
