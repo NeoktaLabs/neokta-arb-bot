@@ -18,6 +18,19 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseNumberArray(value: string | undefined, fallback: number[]): number[] {
+  if (!value || value.trim() === "") {
+    return fallback;
+  }
+
+  const parsed = value
+    .split(",")
+    .map((v) => Number(v.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  return parsed.length > 0 ? parsed : fallback;
+}
+
 function requireAddress(name: string, value: string | undefined) {
   if (!value || value.trim() === "") {
     throw new Error(`Missing required env var: ${name}`);
@@ -60,5 +73,8 @@ export function getEnv(env: Env): AppConfig {
 
     telegramBotToken: env.TELEGRAM_BOT_TOKEN?.trim() || "",
     telegramChatId: env.TELEGRAM_CHAT_ID?.trim() || "",
+
+    // ✅ NEW: ladder config
+    ladderSizes: parseNumberArray(env.LADDER_SIZES, [100, 1000]),
   };
 }
