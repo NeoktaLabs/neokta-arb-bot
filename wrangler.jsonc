@@ -48,13 +48,24 @@
     // STRATEGY CONFIG
     // =========================
 
-    // 🔥 Ladder (optimized)
+    // Ladder
     "LADDER_SIZES": "100,1000",
 
     // Profit thresholds
     "MIN_ALERT_PROFIT_USD": "0",
     "MIN_CONFIDENT_PROFIT_USD": "0.25",
     "MIN_PROFIT_USD": "0.25",
+
+    // =========================
+    // RPC GUARD (PHASE 1)
+    // =========================
+
+    "RPC_MAX_CONCURRENCY": "2",
+    "RPC_MIN_INTERVAL_MS": "100",
+    "RPC_MAX_RETRIES": "3",
+    "RPC_BASE_BACKOFF_MS": "300",
+    "RPC_MAX_BACKOFF_MS": "2000",
+    "RPC_JITTER_MS": "150",
 
     // =========================
     // ALERTING
