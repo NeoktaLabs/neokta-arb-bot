@@ -1,5 +1,6 @@
 // src/config/env.ts
 
+import type { AppConfig } from "../domain/app-config.types";
 import { DEFAULT_ETHERLINK_RPC_URL, normalizeAddress } from "../domain/constants";
 import type { Env } from "../domain/types";
 
@@ -15,15 +16,12 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function getEnv(env: Env) {
+export function getEnv(env: Env): AppConfig {
   if (!env.USDC_ADDRESS) {
     throw new Error("Missing required env var: USDC_ADDRESS");
   }
 
-  const confidentProfitUsd = parseNumber(
-    env.MIN_CONFIDENT_PROFIT_USD ?? env.MIN_PROFIT_USD,
-    0.25
-  );
+  const confidentProfitUsd = parseNumber(env.MIN_CONFIDENT_PROFIT_USD ?? env.MIN_PROFIT_USD, 0.25);
 
   return {
     rpcUrl: env.ETHERLINK_RPC_URL || DEFAULT_ETHERLINK_RPC_URL,
@@ -34,9 +32,7 @@ export function getEnv(env: Env) {
     usdcAddress: normalizeAddress(env.USDC_ADDRESS),
 
     enableOku: parseBoolean(env.ENABLE_OKU, true),
-    okuQuoterV2Address: normalizeAddress(
-      env.OKU_QUOTER_V2_ADDRESS || DEFAULT_OKU_QUOTER_V2_ADDRESS
-    ),
+    okuQuoterV2Address: normalizeAddress(env.OKU_QUOTER_V2_ADDRESS || DEFAULT_OKU_QUOTER_V2_ADDRESS),
 
     enableTelegramAlerts: parseBoolean(env.ENABLE_TELEGRAM_ALERTS, false),
     enableNearMissAlerts: parseBoolean(env.ENABLE_NEAR_MISS_ALERTS, false),

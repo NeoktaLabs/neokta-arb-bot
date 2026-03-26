@@ -1,24 +1,33 @@
 // src/engine/sizing/size-ladder.ts
 
 import type { Env } from "../../domain/types";
+import { isProfitablePnl } from "../pnl/pnl.service";
 import { classifySimulationResult } from "../filters/result-quality.filter";
 import type { GeneratedPath } from "../paths/path.types";
 import { simulatePath } from "../paths/path.simulator";
+import type { PathSimulationResult, SuccessfulPathSimulation } from "../simulation/simulation.types";
 
 export interface SizedSimulationResult {
   size: number;
-  result: any;
+  result: PathSimulationResult;
+  health: "healthy" | "suspicious" | "unsupported";
+  healthReasons: string[];
+}
+
+export interface ProfitableSizedSimulation {
+  size: number;
+  result: SuccessfulPathSimulation;
   health: "healthy" | "suspicious" | "unsupported";
   healthReasons: string[];
 }
 
 export interface PathLadderSummary {
   key: string;
-  type: string;
+  type: GeneratedPath["type"];
   sizes: SizedSimulationResult[];
-  bestOverall: SizedSimulationResult | null;
-  bestHealthy: SizedSimulationResult | null;
-  bestPositive: SizedSimulationResult | null;
+  bestOverall: ProfitableSizedSimulation | null;
+  bestHealthy: ProfitableSizedSimulation | null;
+  bestProfitable: ProfitableSizedSimulation | null;
 }
 
 export function getDefaultSizeLadder(): number[] {
@@ -44,23 +53,27 @@ export async function simulatePathAcrossSizes(
     });
   }
 
-  const resultsWithPnl = ladderResults.filter((entry) => typeof entry.result?.pnlUsd === "number");
-  const healthyResults = resultsWithPnl.filter((entry) => entry.health === "healthy");
-  const positiveResults = healthyResults.filter((entry) => (entry.result.pnlUsd as number) > 0);
+  const successfulResults = ladderResults.filter(
+    (entry): entry is SizedSimulationResult & { result: SuccessfulPathSimulation } => entry.result.ok
+  );
+
+  const healthyResults = successfulResults.filter((entry) => entry.health === "healthy");
+
+  const profitableResults = healthyResults.filter((entry) => isProfitablePnl(entry.result.pnlUsd));
 
   const bestOverall =
-    resultsWithPnl.length > 0
-      ? [...resultsWithPnl].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
+    successfulResults.length > 0
+      ? [...successfulResults].sort((a, b) => b.result.pnlUsd - a.result.pnlUsd)[0]
       : null;
 
   const bestHealthy =
     healthyResults.length > 0
-      ? [...healthyResults].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
+      ? [...healthyResults].sort((a, b) => b.result.pnlUsd - a.result.pnlUsd)[0]
       : null;
 
-  const bestPositive =
-    positiveResults.length > 0
-      ? [...positiveResults].sort((a, b) => (b.result.pnlUsd as number) - (a.result.pnlUsd as number))[0]
+  const bestProfitable =
+    profitableResults.length > 0
+      ? [...profitableResults].sort((a, b) => b.result.pnlUsd - a.result.pnlUsd)[0]
       : null;
 
   return {
@@ -69,6 +82,6 @@ export async function simulatePathAcrossSizes(
     sizes: ladderResults,
     bestOverall,
     bestHealthy,
-    bestPositive,
+    bestProfitable,
   };
 }

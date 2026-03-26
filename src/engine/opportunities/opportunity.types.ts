@@ -20,25 +20,25 @@ export interface OpportunityCandidate {
   classification: "balanced" | "imbalanced" | "extreme";
 }
 
+export interface OpportunityCurvePoint {
+  size: number;
+  pnlUsd: number | null;
+  pnlPct: number | null;
+  health: string;
+  healthReasons: string[];
+}
+
+export interface OpportunityBestResult {
+  size: number;
+  pnlUsd: number;
+  pnlPct: number;
+  health: string;
+}
+
 export interface OpportunityEvaluation {
   candidate: OpportunityCandidate;
-  bestOverall: {
-    size: number;
-    pnlUsd: number | null;
-    pnlPct: number | null;
-    health: string;
-  } | null;
-  bestHealthy: {
-    size: number;
-    pnlUsd: number | null;
-    pnlPct: number | null;
-    health: string;
-  } | null;
-  curve: {
-    size: number;
-    pnlUsd: number | null;
-    pnlPct: number | null;
-    health: string;
-    healthReasons: string[];
-  }[];
+  bestOverall: OpportunityBestResult | null;
+  bestHealthy: OpportunityBestResult | null;
+  bestProfitable: OpportunityBestResult | null;
+  curve: OpportunityCurvePoint[];
 }

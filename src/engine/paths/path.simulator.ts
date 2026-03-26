@@ -2,6 +2,8 @@
 
 import type { Env } from "../../domain/types";
 import { getEnv } from "../../config/env";
+import { computePnl } from "../pnl/pnl.service";
+import type { PathSimulationResult, SimulationStepResult } from "../simulation/simulation.types";
 import { quoteCurveSwap } from "../../integrations/curve/curve.quote";
 import { quoteOkuSwap } from "../../integrations/oku/oku.quote";
 import type { GeneratedPath, PathLeg } from "./path.types";
@@ -52,27 +54,32 @@ async function simulateLeg(env: Env, leg: PathLeg, amountInRaw: bigint): Promise
   });
 }
 
-export async function simulatePath(env: Env, path: GeneratedPath, initialAmount: number) {
+export async function simulatePath(
+  env: Env,
+  path: GeneratedPath,
+  initialAmount: number
+): Promise<PathSimulationResult> {
   try {
     if (!Array.isArray(path.legs) || path.legs.length < 2) {
       throw new Error("Path must contain at least 2 legs");
     }
 
-    const legResults = [];
+    const legResults: SimulationStepResult[] = [];
 
     let currentAmountRaw = toUnits(initialAmount, path.legs[0].tokenInDecimals);
     let currentAmountHuman = initialAmount;
 
-    for (const leg of path.legs) {
+    for (let index = 0; index < path.legs.length; index += 1) {
+      const leg = path.legs[index];
       const amountOutRaw = await simulateLeg(env, leg, currentAmountRaw);
       const amountOutHuman = fromUnits(amountOutRaw, leg.tokenOutDecimals);
 
       legResults.push({
         venue: leg.venue,
-        pool: leg.poolName,
+        poolName: leg.poolName,
         poolAddress: leg.poolAddress,
-        fromSymbol: leg.tokenInSymbol,
-        toSymbol: leg.tokenOutSymbol,
+        tokenInSymbol: leg.tokenInSymbol,
+        tokenOutSymbol: leg.tokenOutSymbol,
         amountIn: currentAmountHuman,
         amountOut: amountOutHuman,
       });
@@ -81,30 +88,34 @@ export async function simulatePath(env: Env, path: GeneratedPath, initialAmount:
       currentAmountHuman = amountOutHuman;
     }
 
-    const finalAmount = currentAmountHuman;
+    const pnl = computePnl(initialAmount, currentAmountHuman);
 
     return {
+      ok: true,
       key: path.key,
       type: path.type,
       sharedTokenSymbol: path.sharedTokenSymbol,
       initialAmount,
-      finalAmount,
-      pnlUsd: finalAmount - initialAmount,
-      pnlPct: initialAmount > 0 ? (finalAmount - initialAmount) / initialAmount : 0,
+      finalAmount: pnl.outputAmount,
+      pnlUsd: pnl.pnlUsd,
+      pnlPct: pnl.pnlPct,
       legs: legResults,
     };
   } catch (error) {
     return {
+      ok: false,
       key: path.key,
       type: path.type,
       sharedTokenSymbol: path.sharedTokenSymbol,
+      initialAmount,
       error: error instanceof Error ? error.message : String(error),
+      failedAtStep: null,
       legs: path.legs.map((leg) => ({
         venue: leg.venue,
-        pool: leg.poolName,
+        poolName: leg.poolName,
         poolAddress: leg.poolAddress,
-        fromSymbol: leg.tokenInSymbol,
-        toSymbol: leg.tokenOutSymbol,
+        tokenInSymbol: leg.tokenInSymbol,
+        tokenOutSymbol: leg.tokenOutSymbol,
       })),
     };
   }

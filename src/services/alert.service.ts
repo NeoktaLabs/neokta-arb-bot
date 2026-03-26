@@ -5,7 +5,7 @@ import type { Env } from "../domain/types";
 import { logError, logInfo } from "../lib/logger";
 
 export interface TelegramAlertMessage {
-  category: "profit" | "near_miss" | "imbalance";
+  category: "profit";
   title: string;
   body: string;
   score: number;

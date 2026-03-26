@@ -3,11 +3,26 @@
 import type { Env } from "../../domain/types";
 import { getDefaultSizeLadder, simulatePathAcrossSizes } from "../sizing/size-ladder";
 import type { GeneratedPath } from "../paths/path.types";
-import type { OpportunityCandidate, OpportunityEvaluation } from "./opportunity.types";
+import type { OpportunityCandidate, OpportunityEvaluation, OpportunityBestResult } from "./opportunity.types";
 
-function dedupeEvaluations(
-  evaluations: OpportunityEvaluation[]
-): OpportunityEvaluation[] {
+function toBestResult(entry: {
+  size: number;
+  health: string;
+  result: { pnlUsd: number; pnlPct: number };
+} | null): OpportunityBestResult | null {
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    size: entry.size,
+    pnlUsd: entry.result.pnlUsd,
+    pnlPct: entry.result.pnlPct,
+    health: entry.health,
+  };
+}
+
+function dedupeEvaluations(evaluations: OpportunityEvaluation[]): OpportunityEvaluation[] {
   const seen = new Set<string>();
   const deduped: OpportunityEvaluation[] = [];
 
@@ -18,8 +33,8 @@ function dedupeEvaluations(
       evaluation.candidate.poolAddress.toLowerCase(),
       evaluation.candidate.token0Symbol,
       evaluation.candidate.token1Symbol,
-      evaluation.bestOverall?.size ?? "none",
-      evaluation.bestOverall?.pnlUsd ?? "none",
+      evaluation.bestProfitable?.size ?? "none",
+      evaluation.bestProfitable?.pnlUsd ?? "none",
       evaluation.curve.length,
     ].join(":");
 
@@ -59,40 +74,13 @@ export async function evaluateOpportunityPaths(args: {
 
     evaluations.push({
       candidate,
-      bestOverall: ladder.bestOverall
-        ? {
-            size: ladder.bestOverall.size,
-            pnlUsd:
-              typeof ladder.bestOverall.result?.pnlUsd === "number"
-                ? ladder.bestOverall.result.pnlUsd
-                : null,
-            pnlPct:
-              typeof ladder.bestOverall.result?.pnlPct === "number"
-                ? ladder.bestOverall.result.pnlPct
-                : null,
-            health: ladder.bestOverall.health,
-          }
-        : null,
-      bestHealthy: ladder.bestHealthy
-        ? {
-            size: ladder.bestHealthy.size,
-            pnlUsd:
-              typeof ladder.bestHealthy.result?.pnlUsd === "number"
-                ? ladder.bestHealthy.result.pnlUsd
-                : null,
-            pnlPct:
-              typeof ladder.bestHealthy.result?.pnlPct === "number"
-                ? ladder.bestHealthy.result.pnlPct
-                : null,
-            health: ladder.bestHealthy.health,
-          }
-        : null,
+      bestOverall: toBestResult(ladder.bestOverall),
+      bestHealthy: toBestResult(ladder.bestHealthy),
+      bestProfitable: toBestResult(ladder.bestProfitable),
       curve: ladder.sizes.map((entry) => ({
         size: entry.size,
-        pnlUsd:
-          typeof entry.result?.pnlUsd === "number" ? entry.result.pnlUsd : null,
-        pnlPct:
-          typeof entry.result?.pnlPct === "number" ? entry.result.pnlPct : null,
+        pnlUsd: entry.result.ok ? entry.result.pnlUsd : null,
+        pnlPct: entry.result.ok ? entry.result.pnlPct : null,
         health: entry.health,
         healthReasons: entry.healthReasons,
       })),
@@ -102,8 +90,8 @@ export async function evaluateOpportunityPaths(args: {
   const deduped = dedupeEvaluations(evaluations);
 
   return deduped.sort((a, b) => {
-    const aScore = a.bestOverall?.pnlUsd ?? -Infinity;
-    const bScore = b.bestOverall?.pnlUsd ?? -Infinity;
+    const aScore = a.bestProfitable?.pnlUsd ?? -Infinity;
+    const bScore = b.bestProfitable?.pnlUsd ?? -Infinity;
     return bScore - aScore;
   });
 }
