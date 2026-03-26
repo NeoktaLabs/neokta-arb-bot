@@ -23,4 +23,6 @@ export interface AppConfig {
 
   telegramBotToken: string;
   telegramChatId: string;
+
+  ladderSizes: number[];
 }
