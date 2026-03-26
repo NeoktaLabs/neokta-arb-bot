@@ -40,6 +40,7 @@ async function simulateLeg(env: Env, leg: PathLeg, amountInRaw: bigint): Promise
   }
 
   const config = getEnv(env);
+
   if (typeof leg.fee !== "number") {
     throw new Error("Oku leg is missing pool fee");
   }
@@ -47,6 +48,7 @@ async function simulateLeg(env: Env, leg: PathLeg, amountInRaw: bigint): Promise
   return quoteOkuSwap({
     env,
     quoterAddress: config.okuQuoterV2Address,
+    poolAddress: leg.poolAddress,
     tokenIn: leg.tokenInAddress,
     tokenOut: leg.tokenOutAddress,
     fee: leg.fee,
