@@ -2,11 +2,12 @@
 
 import type { Env } from "../../domain/types";
 import { getClient } from "../etherlink/rpc.client";
+import { readOkuPoolFactory } from "./oku.client";
 
 const QUOTER_V2_STRUCT_ABI = [
   {
-    type: "function",
     name: "quoteExactInputSingle",
+    type: "function",
     stateMutability: "nonpayable",
     inputs: [
       {
@@ -32,8 +33,8 @@ const QUOTER_V2_STRUCT_ABI = [
 
 const QUOTER_CLASSIC_ABI = [
   {
-    type: "function",
     name: "quoteExactInputSingle",
+    type: "function",
     stateMutability: "nonpayable",
     inputs: [
       { name: "tokenIn", type: "address" },
@@ -48,127 +49,106 @@ const QUOTER_CLASSIC_ABI = [
 
 const QUOTER_STATE_ABI = [
   {
-    type: "function",
     name: "factory",
+    type: "function",
     stateMutability: "view",
     inputs: [],
     outputs: [{ type: "address" }],
   },
   {
-    type: "function",
     name: "WETH9",
+    type: "function",
     stateMutability: "view",
     inputs: [],
     outputs: [{ type: "address" }],
   },
 ] as const;
 
-export type OkuQuoteArgs = {
+export async function quoteOkuSwap(args: {
   env: Env;
   quoterAddress: `0x${string}`;
   poolAddress: `0x${string}`;
-  poolFactory?: `0x${string}`;
   tokenIn: `0x${string}`;
   tokenOut: `0x${string}`;
   fee: number;
   amountIn: bigint;
-};
-
-async function readQuoterState(env: Env, quoterAddress: `0x${string}`) {
-  const client = getClient(env);
-
-  try {
-    const [factory, weth9] = await Promise.all([
-      client.readContract({
-        address: quoterAddress,
-        abi: QUOTER_STATE_ABI,
-        functionName: "factory",
-      }),
-      client.readContract({
-        address: quoterAddress,
-        abi: QUOTER_STATE_ABI,
-        functionName: "WETH9",
-      }),
-    ]);
-
-    return { factory, weth9 };
-  } catch (error) {
-    return {
-      factory: undefined,
-      weth9: undefined,
-      readError: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-async function tryStructQuote(args: OkuQuoteArgs): Promise<bigint> {
+}): Promise<bigint> {
   const client = getClient(args.env);
 
-  const result = await client.readContract({
-    address: args.quoterAddress,
-    abi: QUOTER_V2_STRUCT_ABI,
-    functionName: "quoteExactInputSingle",
-    args: [
-      {
-        tokenIn: args.tokenIn,
-        tokenOut: args.tokenOut,
-        amountIn: args.amountIn,
-        fee: args.fee,
-        sqrtPriceLimitX96: 0n,
-      },
-    ],
-  });
+  const [poolFactory, quoterState] = await Promise.all([
+    readOkuPoolFactory(args.env, args.poolAddress).catch((error) => ({
+      error: error instanceof Error ? error.message : String(error),
+    })),
+    (async () => {
+      try {
+        const [factory, weth9] = await Promise.all([
+          client.readContract({
+            address: args.quoterAddress,
+            abi: QUOTER_STATE_ABI,
+            functionName: "factory",
+          }),
+          client.readContract({
+            address: args.quoterAddress,
+            abi: QUOTER_STATE_ABI,
+            functionName: "WETH9",
+          }),
+        ]);
 
-  return result[0];
-}
-
-async function tryClassicQuote(args: OkuQuoteArgs): Promise<bigint> {
-  const client = getClient(args.env);
-
-  return await client.readContract({
-    address: args.quoterAddress,
-    abi: QUOTER_CLASSIC_ABI,
-    functionName: "quoteExactInputSingle",
-    args: [args.tokenIn, args.tokenOut, args.fee, args.amountIn, 0n],
-  });
-}
-
-export async function quoteOkuSwap(args: OkuQuoteArgs): Promise<bigint> {
-  const quoterState = await readQuoterState(args.env, args.quoterAddress);
-  const attempts: Array<{ shape: "v2-struct" | "classic"; error: string }> = [];
+        return { factory, weth9 };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    })(),
+  ]);
 
   try {
-    return await tryStructQuote(args);
-  } catch (error) {
-    attempts.push({
-      shape: "v2-struct",
-      error: error instanceof Error ? error.message : String(error),
+    const [amountOut] = await client.readContract({
+      address: args.quoterAddress,
+      abi: QUOTER_V2_STRUCT_ABI,
+      functionName: "quoteExactInputSingle",
+      args: [
+        {
+          tokenIn: args.tokenIn,
+          tokenOut: args.tokenOut,
+          amountIn: args.amountIn,
+          fee: args.fee,
+          sqrtPriceLimitX96: 0n,
+        },
+      ],
     });
-  }
 
-  try {
-    return await tryClassicQuote(args);
-  } catch (error) {
-    attempts.push({
-      shape: "classic",
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+    return amountOut;
+  } catch (structError) {
+    try {
+      const amountOut = await client.readContract({
+        address: args.quoterAddress,
+        abi: QUOTER_CLASSIC_ABI,
+        functionName: "quoteExactInputSingle",
+        args: [args.tokenIn, args.tokenOut, args.fee, args.amountIn, 0n],
+      });
 
-  throw new Error(
-    JSON.stringify({
-      message: "Oku quote failed for both signatures",
-      quoterAddress: args.quoterAddress,
-      quoterFactory: quoterState.factory,
-      quoterWeth9: quoterState.weth9,
-      quoterStateReadError: "readError" in quoterState ? quoterState.readError : undefined,
-      poolAddress: args.poolAddress,
-      poolFactory: args.poolFactory,
-      tokenIn: args.tokenIn,
-      tokenOut: args.tokenOut,
-      fee: args.fee,
-      amountIn: args.amountIn.toString(),
-      attempts,
-    })
-  );
+      return amountOut;
+    } catch (classicError) {
+      throw new Error(
+        JSON.stringify({
+          message: "Oku quote failed for both signatures",
+          quoterAddress: args.quoterAddress,
+          poolAddress: args.poolAddress,
+          tokenIn: args.tokenIn,
+          tokenOut: args.tokenOut,
+          fee: args.fee,
+          amountIn: args.amountIn.toString(),
+          poolFactory: "error" in poolFactory ? undefined : poolFactory,
+          poolFactoryReadError: "error" in poolFactory ? poolFactory.error : undefined,
+          quoterFactory: "error" in quoterState ? undefined : quoterState.factory,
+          quoterWeth9: "error" in quoterState ? undefined : quoterState.weth9,
+          quoterStateReadError: "error" in quoterState ? quoterState.error : undefined,
+          structError: structError instanceof Error ? structError.message : String(structError),
+          classicError: classicError instanceof Error ? classicError.message : String(classicError),
+        })
+      );
+    }
+  }
 }
