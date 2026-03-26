@@ -1,7 +1,7 @@
 // src/integrations/curve/curve.pools.ts
 
 import type { Address } from "../../domain/types";
-import type { ChainId } from "../../domain/chain.types";
+import type { ChainId } from "../../domain/chains";
 
 export interface CurvePoolConfig {
   address: Address;
@@ -10,40 +10,56 @@ export interface CurvePoolConfig {
 
 const ETHERLINK_CURVE_POOLS: CurvePoolConfig[] = [
   {
-    name: "Curve USDC/USDT",
-    address: "0x4d14b24EDb751221B3Ff08BBB8bd91D4b1c8bc77",
-  },
-  {
-    name: "Curve USDC/WXTZ",
-    address: "0x22E80bc11a3d3e7Ff4916B12a4f1c6c7C4d3A6D6",
-  },
-  {
-    name: "Curve USDC/USDtz",
-    address: "0x4C9Bf2Ff7A06E4E0aB1f7d4b1f58D7d4A76f5A60",
-  },
-  {
-    name: "Curve XU308/USDC",
-    address: "0xA4D64f4f4A8d0e9b2f1f94d7A4e4E7D7b8b4C2D1",
-  },
-  {
     name: "Curve mBASIS/USDC",
-    address: "0x6f6F2D4f5f9A6A4c3b2d1c7E6b5f4e3d2c1b0a98",
+    address: "0x0714027e44802b2ff76389daf5371990cc3a4c24",
   },
   {
     name: "Curve mRE7/USDC",
-    address: "0x7b7A3e2d1c4f5a6b7c8d9e0f1a2b3c4d5e6f7081",
+    address: "0x5d37f9b272ca7cda2a05245b9a503746eefac88f",
+  },
+  {
+    name: "Curve stXTZ/WXTZ",
+    address: "0x74d80ee400d3026fdd2520265cc98300710b25d4",
   },
   {
     name: "Curve mTBILL/USDC",
-    address: "0x8c8B4f3e2d5a6b7c8d9e0f1a2b3c4d5e6f708192",
+    address: "0x942644106b073e30d72c2c5d7529d5c296ea91ab",
   },
   {
     name: "Curve USDSM/USDC",
-    address: "0x9d9C5a4f3e6b7c8d9e0f1a2b3c4d5e6f708193a3",
+    address: "0x95af759ec2f4385edbbba959a8a1cdc65610d080",
   },
   {
     name: "Curve mMEV/USDC",
-    address: "0xaeAd6b5a4f7c8d9e0f1a2b3c4d5e6f708194b4b4",
+    address: "0x269b47978f4348c96f521658ef452ff85906fcfe",
+  },
+  {
+    name: "Curve USDC/USDT",
+    address: "0x2d84d79c852f6842abe0304b70bbaa1506add457",
+  },
+  {
+    name: "Curve LBTC/WBTC",
+    address: "0x1e8d78e9b3f0152d54d32904b7933f1cfe439df1",
+  },
+  {
+    name: "Curve USDC/USDtz",
+    address: "0xd5e41fcfbcf3a9cc4cc88fd4176106a24899d188",
+  },
+  {
+    name: "Curve XU308/USDC",
+    address: "0x3183f5956a7b8cbaacea34401e227af1c6df6d34",
+  },
+  {
+    name: "Curve XU308/WXTZ",
+    address: "0x8e3da27b6496ca4373ad8261835f56d0107c8e25",
+  },
+  {
+    name: "Curve XU308/WBTC",
+    address: "0xe080d14bf6ecec4c48ebe11055d4dea5dbc30e41",
+  },
+  {
+    name: "Curve USDC/WXTZ",
+    address: "0x78051fbf40581619ffaadb6cd7e5856d4a327a6d",
   },
 ];
 
