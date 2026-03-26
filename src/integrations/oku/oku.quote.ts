@@ -64,6 +64,30 @@ const QUOTER_STATE_ABI = [
   },
 ] as const;
 
+type ReadOk<T> = {
+  ok: true;
+  value: T;
+};
+
+type ReadErr = {
+  ok: false;
+  error: string;
+};
+
+type ReadResult<T> = ReadOk<T> | ReadErr;
+
+async function safeRead<T>(fn: () => Promise<T>): Promise<ReadResult<T>> {
+  try {
+    const value = await fn();
+    return { ok: true, value };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function quoteOkuSwap(args: {
   env: Env;
   quoterAddress: `0x${string}`;
@@ -75,35 +99,26 @@ export async function quoteOkuSwap(args: {
 }): Promise<bigint> {
   const client = getClient(args.env);
 
-  const [poolFactory, quoterState] = await Promise.all([
-    readOkuPoolFactory(args.env, args.poolAddress).catch((error) => ({
-      error: error instanceof Error ? error.message : String(error),
-    })),
-    (async () => {
-      try {
-        const [factory, weth9] = await Promise.all([
-          client.readContract({
-            address: args.quoterAddress,
-            abi: QUOTER_STATE_ABI,
-            functionName: "factory",
-          }),
-          client.readContract({
-            address: args.quoterAddress,
-            abi: QUOTER_STATE_ABI,
-            functionName: "WETH9",
-          }),
-        ]);
+  const [poolFactoryResult, quoterFactoryResult, quoterWeth9Result] =
+    await Promise.all([
+      safeRead(() => readOkuPoolFactory(args.env, args.poolAddress)),
+      safeRead(() =>
+        client.readContract({
+          address: args.quoterAddress,
+          abi: QUOTER_STATE_ABI,
+          functionName: "factory",
+        })
+      ),
+      safeRead(() =>
+        client.readContract({
+          address: args.quoterAddress,
+          abi: QUOTER_STATE_ABI,
+          functionName: "WETH9",
+        })
+      ),
+    ]);
 
-        return { factory, weth9 };
-      } catch (error) {
-        return {
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    })(),
-  ]);
-
-  try {
+  const structResult = await safeRead(async () => {
     const [amountOut] = await client.readContract({
       address: args.quoterAddress,
       abi: QUOTER_V2_STRUCT_ABI,
@@ -120,35 +135,50 @@ export async function quoteOkuSwap(args: {
     });
 
     return amountOut;
-  } catch (structError) {
-    try {
-      const amountOut = await client.readContract({
-        address: args.quoterAddress,
-        abi: QUOTER_CLASSIC_ABI,
-        functionName: "quoteExactInputSingle",
-        args: [args.tokenIn, args.tokenOut, args.fee, args.amountIn, 0n],
-      });
+  });
 
-      return amountOut;
-    } catch (classicError) {
-      throw new Error(
-        JSON.stringify({
-          message: "Oku quote failed for both signatures",
-          quoterAddress: args.quoterAddress,
-          poolAddress: args.poolAddress,
-          tokenIn: args.tokenIn,
-          tokenOut: args.tokenOut,
-          fee: args.fee,
-          amountIn: args.amountIn.toString(),
-          poolFactory: "error" in poolFactory ? undefined : poolFactory,
-          poolFactoryReadError: "error" in poolFactory ? poolFactory.error : undefined,
-          quoterFactory: "error" in quoterState ? undefined : quoterState.factory,
-          quoterWeth9: "error" in quoterState ? undefined : quoterState.weth9,
-          quoterStateReadError: "error" in quoterState ? quoterState.error : undefined,
-          structError: structError instanceof Error ? structError.message : String(structError),
-          classicError: classicError instanceof Error ? classicError.message : String(classicError),
-        })
-      );
-    }
+  if (structResult.ok) {
+    return structResult.value;
   }
+
+  const classicResult = await safeRead(() =>
+    client.readContract({
+      address: args.quoterAddress,
+      abi: QUOTER_CLASSIC_ABI,
+      functionName: "quoteExactInputSingle",
+      args: [args.tokenIn, args.tokenOut, args.fee, args.amountIn, 0n],
+    })
+  );
+
+  if (classicResult.ok) {
+    return classicResult.value;
+  }
+
+  throw new Error(
+    JSON.stringify({
+      message: "Oku quote failed for both signatures",
+      quoterAddress: args.quoterAddress,
+      poolAddress: args.poolAddress,
+      tokenIn: args.tokenIn,
+      tokenOut: args.tokenOut,
+      fee: args.fee,
+      amountIn: args.amountIn.toString(),
+
+      poolFactory: poolFactoryResult.ok ? poolFactoryResult.value : undefined,
+      poolFactoryReadError: poolFactoryResult.ok ? undefined : poolFactoryResult.error,
+
+      quoterFactory: quoterFactoryResult.ok ? quoterFactoryResult.value : undefined,
+      quoterFactoryReadError: quoterFactoryResult.ok
+        ? undefined
+        : quoterFactoryResult.error,
+
+      quoterWeth9: quoterWeth9Result.ok ? quoterWeth9Result.value : undefined,
+      quoterWeth9ReadError: quoterWeth9Result.ok
+        ? undefined
+        : quoterWeth9Result.error,
+
+      structError: structResult.error,
+      classicError: classicResult.error,
+    })
+  );
 }
