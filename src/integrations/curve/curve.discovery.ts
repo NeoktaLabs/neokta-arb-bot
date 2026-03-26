@@ -1,61 +1,54 @@
 // src/integrations/curve/curve.discovery.ts
 
-import type { ChainId } from "../../domain/chain.types";
-import type { Env } from "../../domain/types";
 import { getEnv } from "../../config/env";
-import { normalizeAddress, isUsdcAddress } from "../../domain/constants";
+import { isUsdcAddress } from "../../domain/constants";
+import type { ChainId } from "../../domain/chains";
+import type { Env } from "../../domain/types";
 import { logError, logInfo } from "../../lib/logger";
-import { getCurvePoolSnapshot } from "./curve.client";
+import { hasThirdCoin, getCurvePoolSnapshot } from "./curve.client";
 import { getCurvePoolsForChain } from "./curve.pools";
 import type { DiscoveredCurvePool } from "./curve.types";
-
-function humanizeBalance(raw: bigint, decimals: number): number {
-  const base = 10n ** BigInt(decimals);
-  const whole = raw / base;
-  const fraction = raw % base;
-  const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 8);
-  return Number(`${whole.toString()}.${fractionStr || "0"}`);
-}
 
 export async function discoverCurvePools(
   env: Env,
   chainId: ChainId
 ): Promise<DiscoveredCurvePool[]> {
-  const config = getEnv(env);
-  const pools = getCurvePoolsForChain(chainId);
-  const discovered: DiscoveredCurvePool[] = [];
+  const config = getEnv(env, chainId);
+  const results: DiscoveredCurvePool[] = [];
 
-  for (const pool of pools) {
+  for (const pool of getCurvePoolsForChain(chainId)) {
     try {
       const snapshot = await getCurvePoolSnapshot(env, chainId, pool.address);
-
-      const tokens = snapshot.tokens.map((token, index) => ({
-        ...token,
-        index,
-        balance: humanizeBalance(snapshot.rawBalances[index], token.decimals),
-        rawBalance: snapshot.rawBalances[index],
-      }));
-
-      const usdcToken = tokens.find((token) =>
-        isUsdcAddress(normalizeAddress(token.address), config.usdcAddress)
+      const thirdCoin = await hasThirdCoin(env, chainId, pool.address);
+      const usdcCoin = snapshot.coins.find((coin) =>
+        isUsdcAddress(coin.address, config.usdcAddress)
       );
 
-      const result: DiscoveredCurvePool = {
+      const discovered: DiscoveredCurvePool = {
         name: pool.name,
-        address: normalizeAddress(pool.address),
-        tokens,
-        hasUsdc: Boolean(usdcToken),
-        usdcTokenAddress: usdcToken ? normalizeAddress(usdcToken.address) : null,
+        address: pool.address,
+        coins: snapshot.coins,
+        balances: snapshot.balances,
+        hasUsdc: Boolean(usdcCoin),
+        isTwoCoinPool: !thirdCoin,
+        usdcCoinAddress: usdcCoin?.address ?? null,
       };
 
-      discovered.push(result);
+      results.push(discovered);
 
       logInfo("curve.pool.discovered", {
         chainId,
-        pool: result.name,
-        address: result.address,
-        tokenCount: result.tokens.length,
-        hasUsdc: result.hasUsdc,
+        pool: pool.name,
+        address: pool.address,
+        coins: snapshot.coins.map((coin) => ({
+          index: coin.index,
+          address: coin.address,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+        })),
+        balances: snapshot.balances,
+        hasUsdc: discovered.hasUsdc,
+        isTwoCoinPool: discovered.isTwoCoinPool,
       });
     } catch (error) {
       logError("curve.pool.discovery_failed", {
@@ -67,5 +60,5 @@ export async function discoverCurvePools(
     }
   }
 
-  return discovered;
+  return results;
 }
