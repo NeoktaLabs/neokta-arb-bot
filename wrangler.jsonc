@@ -33,7 +33,7 @@
     // Backward compatibility if parts of your code still read this
     "MIN_PROFIT_USD": "0.25",
 
-    "ETHERLINK_RPC_URL": "https://node.mainnet.etherlink.com",
+    "ETHERLINK_RPC_URL": "https://rpc.ankr.com/etherlink_mainnet",
     "USDC_ADDRESS": "0x796Ea11Fa2dD751eD01b53C372fFDB4AAa8f00F9",
 
     "ENABLE_TELEGRAM_ALERTS": "true",
