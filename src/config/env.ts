@@ -4,7 +4,7 @@ import type { AppConfig } from "../domain/app-config.types";
 import { DEFAULT_ETHERLINK_RPC_URL, normalizeAddress } from "../domain/constants";
 import type { Env } from "../domain/types";
 
-const DEFAULT_OKU_QUOTER_V2_ADDRESS = "0x8cb537fc92e26d8ebbb760e632c95484b6ea3e28";
+const DEFAULT_OKU_QUOTER_V2_ADDRESS = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e";
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined) return defaultValue;
