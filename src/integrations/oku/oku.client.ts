@@ -74,8 +74,12 @@ const ERC20_ABI = [
   },
 ] as const;
 
-async function readTokenMetadata(env: Env, address: `0x${string}`): Promise<OkuPoolToken> {
+async function readTokenMetadata(
+  env: Env,
+  address: `0x${string}`
+): Promise<OkuPoolToken> {
   const client = getClient(env);
+
   const [symbol, decimals] = await Promise.all([
     client.readContract({
       address,
@@ -115,38 +119,39 @@ export async function getOkuPoolSnapshot(
 ): Promise<OkuPoolSnapshot> {
   const client = getClient(env);
 
-  const [factory, token0Address, token1Address, fee, liquidity, slot0] = await Promise.all([
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "factory",
-    }),
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "token0",
-    }),
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "token1",
-    }),
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "fee",
-    }),
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "liquidity",
-    }),
-    client.readContract({
-      address: poolAddress,
-      abi: OKU_POOL_ABI,
-      functionName: "slot0",
-    }),
-  ]);
+  const [factory, token0Address, token1Address, fee, liquidity, slot0] =
+    await Promise.all([
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "factory",
+      }),
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "token0",
+      }),
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "token1",
+      }),
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "fee",
+      }),
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "liquidity",
+      }),
+      client.readContract({
+        address: poolAddress,
+        abi: OKU_POOL_ABI,
+        functionName: "slot0",
+      }),
+    ]);
 
   const [token0, token1] = await Promise.all([
     readTokenMetadata(env, token0Address),
