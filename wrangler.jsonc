@@ -36,7 +36,7 @@
     // =========================
 
     "ENABLE_ETHEREUM": "true",
-    "ETHEREUM_RPC_URL": "https://eth.llamarpc.com",
+    "ETHEREUM_RPC_URL": "https://ethereum-mainnet.gateway.tatum.io",
     "ETHEREUM_USDC_ADDRESS": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 
     // Uniswap V3 (Ethereum)
