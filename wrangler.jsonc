@@ -22,7 +22,7 @@
   "vars": {
     "INITIAL_USDC": "1000",
 
-    "OKU_QUOTER_V2_ADDRESS": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+    "OKU_QUOTER_V2_ADDRESS": "0xaa52bB8110fE38D0d2d2AF0B85C3A3eE622CA455",
 
     // Alert on any positive full-route PnL
     "MIN_ALERT_PROFIT_USD": "0",
