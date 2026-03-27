@@ -11,10 +11,22 @@ export const ETHEREUM_UNISWAP_POOLS: UniswapPoolSeed[] = [
     fee: 100,
   },
   {
+    name: "Uniswap USDC/USDT 0.05%",
+    token0: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    token1: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    fee: 500,
+  },
+  {
     name: "Uniswap DAI/USDC 0.01%",
     token0: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
     token1: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     fee: 100,
+  },
+  {
+    name: "Uniswap DAI/USDC 0.05%",
+    token0: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    token1: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    fee: 500,
   },
   {
     name: "Uniswap DAI/USDT 0.01%",
@@ -43,10 +55,22 @@ export const ETHEREUM_UNISWAP_POOLS: UniswapPoolSeed[] = [
     fee: 500,
   },
   {
+    name: "Uniswap USDT/WETH 0.3%",
+    token0: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    fee: 3000,
+  },
+  {
     name: "Uniswap DAI/WETH 0.05%",
     token0: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
     token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     fee: 500,
+  },
+  {
+    name: "Uniswap DAI/WETH 0.3%",
+    token0: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    fee: 3000,
   },
 
   // BTC connectors
