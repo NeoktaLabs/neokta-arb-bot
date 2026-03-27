@@ -41,6 +41,8 @@ export interface Env {
   RPC_BASE_BACKOFF_MS?: string;
   RPC_MAX_BACKOFF_MS?: string;
   RPC_JITTER_MS?: string;
+
+  SCAN_LOCK?: DurableObjectNamespace;
 }
 
 export type TokenSymbol = string;
