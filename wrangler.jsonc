@@ -13,6 +13,22 @@
     }
   },
 
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SCAN_LOCK",
+        "class_name": "ScanLockDurableObject"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1-scan-lock",
+      "new_classes": ["ScanLockDurableObject"]
+    }
+  ],
+
   "triggers": {
     "crons": [
       "*/10 * * * *"
@@ -54,7 +70,7 @@
     "MIN_PROFIT_USD": "0.25",
 
     // =========================
-    // RPC GUARD (IMPORTANT)
+    // RPC GUARD
     // =========================
 
     "RPC_MAX_CONCURRENCY": "1",
