@@ -54,6 +54,8 @@ function isRetryableRpcError(error: unknown): boolean {
     normalized.includes("too many requests") ||
     normalized.includes("rate limit") ||
     normalized.includes("call rate limit exhausted") ||
+    normalized.includes("header not found") ||
+    normalized.includes("missing trie node") ||
     normalized.includes("timeout") ||
     normalized.includes("timed out") ||
     normalized.includes("socket hang up") ||
@@ -61,7 +63,10 @@ function isRetryableRpcError(error: unknown): boolean {
     normalized.includes("fetch failed") ||
     normalized.includes("internal error") ||
     normalized.includes("service unavailable") ||
-    normalized.includes("temporarily unavailable")
+    normalized.includes("temporarily unavailable") ||
+    normalized.includes("upstream") ||
+    normalized.includes("connection reset") ||
+    normalized.includes("econnreset")
   );
 }
 
