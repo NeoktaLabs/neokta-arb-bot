@@ -31,6 +31,7 @@ export function buildTrustedPools(
     if (!usdcCoin || !otherCoin) continue;
 
     trusted.push({
+      chainId: pool.chainId,
       address: pool.address,
       name: pool.name,
 

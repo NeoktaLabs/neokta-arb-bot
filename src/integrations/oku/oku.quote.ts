@@ -118,8 +118,8 @@ export async function quoteOkuSwap(args: {
       ),
     ]);
 
-  const structResult = await safeRead(async () => {
-    const [amountOut] = await client.readContract({
+  const structResult = await safeRead<bigint>(() =>
+    client.readContract({
       address: args.quoterAddress,
       abi: QUOTER_V2_STRUCT_ABI,
       functionName: "quoteExactInputSingle",
@@ -132,16 +132,14 @@ export async function quoteOkuSwap(args: {
           sqrtPriceLimitX96: 0n,
         },
       ],
-    });
-
-    return amountOut;
-  });
+    })
+  );
 
   if (structResult.ok) {
     return structResult.value;
   }
 
-  const classicResult = await safeRead(() =>
+  const classicResult = await safeRead<bigint>(() =>
     client.readContract({
       address: args.quoterAddress,
       abi: QUOTER_CLASSIC_ABI,
