@@ -9,8 +9,7 @@ const QUOTER_CLASSIC_ABI = [{ name:"quoteExactInputSingle", type:"function", sta
 export async function quoteUniswapSwap(args: { env: Env; quoterAddress: `0x${string}`; tokenIn: `0x${string}`; tokenOut: `0x${string}`; fee: number; amountIn: bigint; }): Promise<bigint> {
   const client = getClient(args.env, "ethereum");
   try {
-    const [amountOut] = await client.readContract({ address: args.quoterAddress, abi: QUOTER_V2_STRUCT_ABI, functionName: "quoteExactInputSingle", args: [{ tokenIn: args.tokenIn, tokenOut: args.tokenOut, amountIn: args.amountIn, fee: args.fee, sqrtPriceLimitX96: 0n }] });
-    return amountOut;
+    return client.readContract({ address: args.quoterAddress, abi: QUOTER_V2_STRUCT_ABI, functionName: "quoteExactInputSingle", args: [{ tokenIn: args.tokenIn, tokenOut: args.tokenOut, amountIn: args.amountIn, fee: args.fee, sqrtPriceLimitX96: 0n }] });
   } catch {
     return client.readContract({ address: args.quoterAddress, abi: QUOTER_CLASSIC_ABI, functionName: "quoteExactInputSingle", args: [args.tokenIn, args.tokenOut, args.fee, args.amountIn, 0n] });
   }

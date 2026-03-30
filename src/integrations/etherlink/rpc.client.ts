@@ -6,10 +6,12 @@ import type { ChainId } from "../../domain/chains";
 import type { Env } from "../../domain/types";
 import { runWithRpcGuard } from "../rpc/rpc-guard";
 
-const rawClients = new Map<string, ReturnType<typeof createPublicClient>>();
-const guardedClients = new Map<string, ReturnType<typeof getClient>>();
+type RpcClient = ReturnType<typeof createPublicClient>;
 
-function getRawClient(env: Env, chainId: ChainId) {
+const rawClients = new Map<string, RpcClient>();
+const guardedClients = new Map<string, RpcClient>();
+
+function getRawClient(env: Env, chainId: ChainId): RpcClient {
   const { rpcUrl } = getEnv(env, chainId);
   const cacheKey = `${chainId}:${rpcUrl}`;
 
@@ -24,7 +26,7 @@ function getRawClient(env: Env, chainId: ChainId) {
   return client;
 }
 
-export function getClient(env: Env, chainId: ChainId = "etherlink") {
+export function getClient(env: Env, chainId: ChainId = "etherlink"): RpcClient {
   const config = getEnv(env, chainId);
   const cacheKey = `${chainId}:${config.rpcUrl}:${config.rpcMaxConcurrency}:${config.rpcMinIntervalMs}:${config.rpcMaxRetries}`;
 
@@ -53,7 +55,7 @@ export function getClient(env: Env, chainId: ChainId = "etherlink") {
       runWithRpcGuard(`${keyPrefix}:getBytecode`, guardOptions, () => rawClient.getBytecode(args)),
     call: (args: Parameters<typeof rawClient.call>[0]) =>
       runWithRpcGuard(`${keyPrefix}:call`, guardOptions, () => rawClient.call(args)),
-  };
+  } as RpcClient;
 
   guardedClients.set(cacheKey, guarded);
   return guarded;

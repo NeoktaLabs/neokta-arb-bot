@@ -25,6 +25,7 @@ export async function discoverCurvePools(
       );
 
       const discovered: DiscoveredCurvePool = {
+        chainId,
         name: pool.name,
         address: pool.address,
         coins: snapshot.coins,

@@ -38,6 +38,7 @@ function buildUsdcToTokenLeg(pool: DiscoveredCurvePool, tokenAddress: string): P
   }
 
   return {
+    chainId: pool.chainId,
     venue: "curve",
     poolAddress: pool.address,
     poolName: pool.name,
@@ -63,6 +64,7 @@ function buildTokenToUsdcLeg(pool: DiscoveredCurvePool, tokenAddress: string): P
   }
 
   return {
+    chainId: pool.chainId,
     venue: "curve",
     poolAddress: pool.address,
     poolName: pool.name,
@@ -96,6 +98,7 @@ function buildInternalPoolLeg(
   }
 
   return {
+    chainId: internalPool.chainId,
     venue: "curve",
     poolAddress: internalPool.address,
     poolName: internalPool.name,

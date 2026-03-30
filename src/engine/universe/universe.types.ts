@@ -1,8 +1,10 @@
 // src/engine/universe/universe.types.ts
 
+import type { ChainId } from "../../domain/chains";
 import type { Address } from "../../domain/types";
 
 export interface TrustedPool {
+  chainId: ChainId;
   address: Address;
   name?: string;
 
